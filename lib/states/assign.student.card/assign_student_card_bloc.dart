@@ -1,4 +1,5 @@
 import 'package:attendance/api/auth.service.dart';
+import 'package:attendance/models/single.student.model.dart';
 import 'package:attendance/models/student.model.dart';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
@@ -21,7 +22,7 @@ class AssignStudentCardBloc
       } else {
         if (event is HandleAssignStudentCardEvent) {
           emit(AssignStudentCardLoading());
-          StudentModel studentModel;
+          SingleStudentModel studentModel;
           studentModel =
               await locationService.assignCardToStudents(
                 event.studentCode,event.cardId

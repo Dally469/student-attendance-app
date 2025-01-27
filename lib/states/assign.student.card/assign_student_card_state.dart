@@ -14,7 +14,7 @@ class AssignStudentCardInitial extends AssignStudentCardState {}
 class AssignStudentCardLoading extends AssignStudentCardState {}
 
 class AssignStudentCardSuccess extends AssignStudentCardState {
-  StudentModel studentModel;
+  SingleStudentModel studentModel;
   AssignStudentCardSuccess({
     required this.studentModel,
   });

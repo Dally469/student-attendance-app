@@ -32,6 +32,7 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
   }
 
   int studentLength = 0;
+  List<dynamic> students = [];
 
   Future<bool> _onWillPop() async {
     return false;
@@ -151,8 +152,8 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
                   itemCount: state.studentModel.data!.length,
                   itemBuilder: (context, index) {
                     final student = state.studentModel.data![index];
-                    final isCardAssigned = student.cardAvailable !=
-                        null; // Check if the card is assigned
+                    final isCardAssigned = student
+                        .isCardAvailable; // Check if the card is assigned
 
                     return Container(
                       margin: const EdgeInsets.symmetric(
@@ -206,8 +207,15 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
                             ),
                           ],
                         ),
-                        trailing: isCardAssigned
-                            ? null
+                        trailing: isCardAssigned == true
+                            ? Text(
+                                'Assigned',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              )
                             : TextButton(
                                 onPressed: () {
                                   // Add your "Assign Card" logic here
@@ -216,6 +224,8 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
                                     'studentId': student.id.toString(),
                                     'studentCode': student.code.toString(),
                                     'classroom': student.classroom.toString(),
+                                    'profileImage':
+                                        student.profileImage.toString(),
                                   });
                                 },
                                 style: TextButton.styleFrom(
@@ -242,6 +252,8 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
                             'studentName': student.name.toString(),
                             'studentId': student.id.toString(),
                             'studentCode': student.code.toString(),
+                            'classroom': student.classroom.toString(),
+                            'profileImage': student.profileImage.toString(),
                           });
                         },
                       ),

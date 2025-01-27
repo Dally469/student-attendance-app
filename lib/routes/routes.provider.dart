@@ -78,6 +78,7 @@ class AppNavigation {
               studentCode: state.uri.queryParameters['studentCode'],
               studentName: state.uri.queryParameters['studentName'],
               classroom: state.uri.queryParameters['classroom'],
+              profileImage: state.uri.queryParameters['profileImage'],
             ),
           ),
         ],
