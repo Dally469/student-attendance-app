@@ -143,141 +143,6 @@ class _AssignCardPageState extends State<AssignCardPage> {
   }
 
   @override
-  // Widget build(BuildContext context) {
-  //   return Scaffold(
-  //     appBar: AppBar(
-  //       title: Text(
-  //         'Assign Card',
-  //         style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-  //       ),
-  //       backgroundColor: Colors.blue,
-  //     ),
-  //     body: BlocListener<AssignStudentCardBloc, AssignStudentCardState>(
-  //       listener: (context, state) {
-  //         if (state is AssignStudentCardSuccess) {
-  //           ScaffoldMessenger.of(context).showSnackBar(
-  //             const SnackBar(content: Text('Card assigned successfully!')),
-  //           );
-  //           Future.delayed(const Duration(seconds: 2), () {
-  //             context.safeGoNamed(assignCard, params: {
-  //               'classroom': widget.classroom.toString(),
-  //               'classroomId': widget.studentId.toString(),
-  //             });
-  //           });
-  //         } else if (state is AssignStudentCardError) {
-  //           ScaffoldMessenger.of(context).showSnackBar(
-  //             SnackBar(content: Text('Error: ${state.message}')),
-  //           );
-  //         }
-  //       },
-  //       child: SingleChildScrollView(
-  //         padding: const EdgeInsets.all(16.0),
-  //         child: Column(
-  //           mainAxisAlignment: MainAxisAlignment.center,
-  //           children: [
-  //             if (!isNfcAvailable)
-  //               const Card(
-  //                 color: Colors.red,
-  //                 child: Padding(
-  //                   padding: EdgeInsets.all(16.0),
-  //                   child: Text(
-  //                     'NFC is not available on this device',
-  //                     style: TextStyle(color: Colors.white),
-  //                   ),
-  //                 ),
-  //               )
-  //             else ...[
-  //               Card(
-  //                 child: Padding(
-  //                   padding: const EdgeInsets.all(16.0),
-  //                   child: Column(
-  //                     children: [
-  //                       Text(
-  //                         'Assign Card to Student:',
-  //                         style: GoogleFonts.poppins(fontSize: 18),
-  //                         textAlign: TextAlign.center,
-  //                       ),
-  //                       const SizedBox(height: 8),
-  //                       Text(
-  //                         widget.studentName.toString(),
-  //                         style: GoogleFonts.poppins(
-  //                           fontSize: 22,
-  //                           fontWeight: FontWeight.bold,
-  //                           color: Colors.blue,
-  //                         ),
-  //                       ),
-  //                     ],
-  //                   ),
-  //                 ),
-  //               ),
-  //               const SizedBox(height: 24),
-  //               BlocBuilder<AssignStudentCardBloc, AssignStudentCardState>(
-  //                 builder: (context, state) {
-  //                   if (state is AssignStudentCardLoading || isReading) {
-  //                     return const Column(
-  //                       children: [
-  //                         CircularProgressIndicator(),
-  //                         SizedBox(height: 16),
-  //                         Text('Reading NFC card...'),
-  //                       ],
-  //                     );
-  //                   } else if (state is AssignStudentCardSuccess) {
-  //                     return const Column(
-  //                       children: [
-  //                         Icon(Icons.check_circle,
-  //                             size: 100, color: Colors.green),
-  //                         SizedBox(height: 16),
-  //                         Text('Card assigned successfully!'),
-  //                       ],
-  //                     );
-  //                   } else {
-  //                     return Column(
-  //                       children: [
-  //                         ElevatedButton.icon(
-  //                           onPressed: startNfcSession,
-  //                           icon: const Icon(Icons.nfc),
-  //                           label: const Text('Start Reading Card'),
-  //                           style: ElevatedButton.styleFrom(
-  //                             padding: const EdgeInsets.symmetric(
-  //                               horizontal: 32,
-  //                               vertical: 16,
-  //                             ),
-  //                           ),
-  //                         ),
-  //                         if (lastTagInfo != null) ...[
-  //                           const SizedBox(height: 24),
-  //                           Card(
-  //                             child: Padding(
-  //                               padding: const EdgeInsets.all(16.0),
-  //                               child: Column(
-  //                                 crossAxisAlignment: CrossAxisAlignment.start,
-  //                                 children: [
-  //                                   Text(
-  //                                     'Last Read Tag Info:',
-  //                                     style: GoogleFonts.poppins(
-  //                                       fontWeight: FontWeight.bold,
-  //                                     ),
-  //                                   ),
-  //                                   const SizedBox(height: 8),
-  //                                   Text(lastTagInfo!),
-  //                                 ],
-  //                               ),
-  //                             ),
-  //                           ),
-  //                         ],
-  //                       ],
-  //                     );
-  //                   }
-  //                 },
-  //               ),
-  //             ],
-  //           ],
-  //         ),
-  //       ),
-  //     ),
-  //   );
-  // }
-
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -317,7 +182,7 @@ class _AssignCardPageState extends State<AssignCardPage> {
                 )
               else ...[
                 CircleAvatar(
-                  radius: 60,
+                  radius: 100,
                   backgroundColor: primaryColor.withOpacity(0.1),
                   backgroundImage: widget.profileImage != null
                       ? NetworkImage(widget.profileImage.toString())
@@ -326,11 +191,6 @@ class _AssignCardPageState extends State<AssignCardPage> {
                       ? const Icon(Icons.person, color: primaryColor)
                       : null,
                 ),
-                Text(
-                  'Place the NFC card on the device to assign to:',
-                  style: GoogleFonts.poppins(fontSize: 18),
-                  textAlign: TextAlign.center,
-                ),
                 const SizedBox(height: 8),
                 Text(
                   widget.studentName.toString(),
@@ -338,6 +198,15 @@ class _AssignCardPageState extends State<AssignCardPage> {
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 30.0),
+                  child: Text(
+                    'Place the NFC card on the device to assign to',
+                    style: GoogleFonts.poppins(fontSize: 18),
+                    textAlign: TextAlign.center,
                   ),
                 ),
                 const SizedBox(height: 24),

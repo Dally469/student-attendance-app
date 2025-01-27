@@ -1,0 +1,78 @@
+class CheckInModel {
+  final bool success;
+  final int status;
+  final String message;
+  final CheckInData? data;
+
+  CheckInModel({
+    required this.success,
+    required this.status,
+    required this.message,
+    this.data,
+  });
+
+  factory CheckInModel.fromJson(Map<String, dynamic> json) {
+    return CheckInModel(
+      success: json['success'] ?? false,
+      status: json['status'] ?? 400,
+      message: json['message'] ?? 'Unknown error',
+      data: json['data'] != null ? CheckInData.fromJson(json['data']) : null,
+    );
+  }
+}
+
+class CheckInData {
+  final String id;
+  final String studentId;
+  final String classroomId;
+  final String attendanceId;
+  final String checkInTime;
+  final String? checkOutTime;
+  final String attendanceStartTime;
+  final String attendanceEndTime;
+  final String status;
+  final int attendedMinutes;
+
+  CheckInData({
+    required this.id,
+    required this.studentId,
+    required this.classroomId,
+    required this.attendanceId,
+    required this.checkInTime,
+    this.checkOutTime,
+    required this.attendanceStartTime,
+    required this.attendanceEndTime,
+    required this.status,
+    required this.attendedMinutes,
+  });
+
+  factory CheckInData.fromJson(Map<String, dynamic> json) {
+    return CheckInData(
+      id: json['id'] ?? '',
+      studentId: json['studentId'] ?? '',
+      classroomId: json['classroomId'] ?? '',
+      attendanceId: json['attendanceId'] ?? '',
+      checkInTime: json['checkInTime'] ?? '',
+      checkOutTime: json['checkOutTime'],
+      attendanceStartTime: json['attendanceStartTime'] ?? '',
+      attendanceEndTime: json['attendanceEndTime'] ?? '',
+      status: json['status'] ?? '',
+      attendedMinutes: json['attendedMinutes'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'studentId': studentId,
+      'classroomId': classroomId,
+      'attendanceId': attendanceId,
+      'checkInTime': checkInTime,
+      'checkOutTime': checkOutTime,
+      'attendanceStartTime': attendanceStartTime,
+      'attendanceEndTime': attendanceEndTime,
+      'status': status,
+      'attendedMinutes': attendedMinutes,
+    };
+  }
+}

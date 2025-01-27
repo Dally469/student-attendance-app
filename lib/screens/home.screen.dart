@@ -4,6 +4,7 @@ import 'package:attendance/api/auth.service.dart';
 import 'package:attendance/models/classroom.model.dart';
 import 'package:attendance/routes/routes.names.dart';
 import 'package:attendance/routes/routes.provider.dart';
+import 'package:attendance/states/classroom.student/classroom_student_bloc.dart';
 import 'package:attendance/states/school.classroom/school_classroom_bloc.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:flutter/foundation.dart';
@@ -40,11 +41,15 @@ class _HomeState extends State<Home> {
   SchoolClassroomBloc schoolClassroomBloc =
       SchoolClassroomBloc(SchoolClassroomInitial(), AuthService());
 
+  ClassroomStudentBloc classroomStudentBloc =
+      ClassroomStudentBloc(ClassroomStudentInitial(), AuthService());
+
   @override
   void initState() {
     super.initState();
     getCurrentUserInfo();
     schoolClassroomBloc = BlocProvider.of<SchoolClassroomBloc>(context);
+    classroomStudentBloc = BlocProvider.of<ClassroomStudentBloc>(context);
   }
 
   // Function to build the Drawer
@@ -261,12 +266,12 @@ class _HomeState extends State<Home> {
               Container(
                 margin: const EdgeInsets.only(left: 16.0),
                 child: Text(
-                  'Select Classroom for  Student $selectedService ',
+                  'Select Classroom for $selectedService ',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.poppins(
                       fontSize: 20,
-                      fontWeight: FontWeight.w500,
-                      color: primaryColor),
+                      fontWeight: FontWeight.w600,
+                      color: blackColor),
                 ),
               ),
               const SizedBox(height: 20),
@@ -287,7 +292,7 @@ class _HomeState extends State<Home> {
                               children: [
                                 const SizedBox(height: 20),
                                 Text(
-                                  'Loading classroom for student $selectedService',
+                                  'Loading classroom for $selectedService',
                                   style: GoogleFonts.poppins(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w400,
@@ -367,6 +372,8 @@ class _HomeState extends State<Home> {
                             ),
                             child: ListTile(
                               title: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Column(
                                     crossAxisAlignment:
@@ -377,11 +384,11 @@ class _HomeState extends State<Home> {
                                         style: GoogleFonts.poppins(
                                           fontSize: 24,
                                           fontWeight: FontWeight.w500,
-                                          color: primaryColor,
+                                          color: greenColor,
                                         ),
                                       ),
                                       Text(
-                                        'School: \n${state.schoolClassroomModel.data![index].school!.name}',
+                                        '${state.schoolClassroomModel.data![index].school!.name}',
                                         style: GoogleFonts.poppins(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w300,
@@ -389,6 +396,19 @@ class _HomeState extends State<Home> {
                                       ),
                                     ],
                                   ),
+                                  Visibility(
+                                    visible: selectedService != "card",
+                                    child: TextButton(
+                                        onPressed: () {},
+                                        child: const Text(
+                                          "Make Attendance",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: primaryColor,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        )),
+                                  )
                                 ],
                               ),
                               onTap: () {
@@ -400,6 +420,10 @@ class _HomeState extends State<Home> {
                                     .schoolClassroomModel.data![index].id
                                     .toString();
 
+                                classroomStudentBloc.add(
+                                    FetchClassroomStudentEvent(
+                                        classroom:
+                                            obtainedClassroom.toString()));
                                 if (selectedService == "card") {
                                   context.safeGoNamed(assignCard, params: {
                                     'classroom': obtainedClassroom,
@@ -408,7 +432,9 @@ class _HomeState extends State<Home> {
                                 } else {
                                   context.safeGoNamed(makeAttendance, params: {
                                     'classroom': obtainedClassroom,
-                                    'classroomId': obtainedClassroomId
+                                    'classroomId': obtainedClassroomId,
+                                    'attendanceId':
+                                        "450ab881-a4b6-4f8d-ba92-5d00fd5ad21c",
                                   });
                                 }
                               },

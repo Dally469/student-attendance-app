@@ -42,8 +42,8 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
   didChangeDependencies() {
     super.didChangeDependencies();
 
-    classroomStudentBloc.add(
-        FetchClassroomStudentEvent(classroom: widget.classroom.toString()));
+    // classroomStudentBloc.add(
+    //     FetchClassroomStudentEvent(classroom: widget.classroom.toString()));
   }
 
   @override
@@ -60,7 +60,7 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                "${widget.classroom.toString()}",
+                widget.classroom.toString(),
                 style:
                     const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
               ),
