@@ -21,7 +21,7 @@ class Heading extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 30),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
             child: Text(
               title,
               textAlign: TextAlign.left,

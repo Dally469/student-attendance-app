@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-const primaryColor = Color.fromRGBO(16, 151, 72, 1.0); //spped color
+const primaryColor = Color.fromRGBO(6, 146, 250, 1.0); //spped color
+// const primaryColor = Color.fromRGBO(16, 151, 72, 1.0); //spped color
 const primaryColorOverlay = Color.fromRGBO(16, 151, 72, 0.782); // speed color
 const primaryColorOverlay1 = Color.fromRGBO(28, 39, 51, 0.4090);
 const primaryColor1 = Color.fromRGBO(211, 138, 1, 1.0);

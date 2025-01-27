@@ -1,5 +1,7 @@
 PODS:
   - Flutter (1.0.0)
+  - nfc_manager (0.0.1):
+    - Flutter
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -9,12 +11,15 @@ PODS:
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
+  - nfc_manager (from `.symlinks/plugins/nfc_manager/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
 
 EXTERNAL SOURCES:
   Flutter:
     :path: Flutter
+  nfc_manager:
+    :path: ".symlinks/plugins/nfc_manager/ios"
   path_provider_foundation:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
   shared_preferences_foundation:
@@ -22,6 +27,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: f04841e97a9d0b0a8025694d0796dd46242b2854
+  nfc_manager: 9c40fe22528ab871ca11e52ea8b95790e9d92ca2
   path_provider_foundation: 608fcb11be570ce83519b076ab6a1fffe2474f05
   shared_preferences_foundation: 0b09b969fb36da5551c0bc4a2dbd9d0ff9387478
 

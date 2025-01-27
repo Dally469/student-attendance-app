@@ -1,4 +1,7 @@
 import 'package:attendance/routes/routes.names.dart';
+import 'package:attendance/screens/add.card.dart';
+import 'package:attendance/screens/assign.card.screen.dart';
+import 'package:attendance/screens/attendance.screen.dart';
 import 'package:attendance/screens/home.screen.dart';
 import 'package:attendance/screens/login.dart';
 import 'package:attendance/screens/splash.screen.dart';
@@ -47,6 +50,35 @@ class AppNavigation {
             path: '/home',
             name: home,
             builder: (context, state) => Home(key: state.pageKey),
+          ),
+          GoRoute(
+            path: '/assignCard',
+            name: assignCard,
+            builder: (context, state) => AssignStudentCard(
+              key: state.pageKey,
+              classroomId: state.uri.queryParameters['classroomId'],
+              classroom: state.uri.queryParameters['classroom'],
+            ),
+          ),
+          GoRoute(
+            path: '/makeAttendance',
+            name: makeAttendance,
+            builder: (context, state) => MakeAttendanceScreen(
+              key: state.pageKey,
+              classroomId: state.uri.queryParameters['classroomId'],
+              classroom: state.uri.queryParameters['classroom'],
+            ),
+          ),
+          GoRoute(
+            path: '/addCard',
+            name: addCard,
+            builder: (context, state) => AssignCardPage(
+              key: state.pageKey,
+              studentId: state.uri.queryParameters['studentId'],
+              studentCode: state.uri.queryParameters['studentCode'],
+              studentName: state.uri.queryParameters['studentName'],
+              classroom: state.uri.queryParameters['classroom'],
+            ),
           ),
         ],
       ),

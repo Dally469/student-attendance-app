@@ -61,7 +61,7 @@ class _LoginPageState extends State<LoginPage> {
                     height: 15,
                   ),
                   Heading(
-                    title: 'Teacher Login',
+                    title: 'School Login',
                     subtitle:
                         'Please enter your school email and password in field bellow',
                   ),
@@ -74,127 +74,8 @@ class _LoginPageState extends State<LoginPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: <Widget>[
-                            Container(
-                              margin: const EdgeInsets.symmetric(
-                                  horizontal: 0, vertical: 15),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 0),
-                              decoration: BoxDecoration(
-                                  color: whiteColor1,
-                                  borderRadius: BorderRadius.circular(33)),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () {
-                                        setState(() {
-                                          isPhone = true;
-                                          _emailController.text = '';
-                                          _passwordController.text = '';
-                                        });
-                                      },
-                                      child: Container(
-                                        margin: const EdgeInsets.symmetric(
-                                            vertical: 5, horizontal: 5),
-                                        decoration: BoxDecoration(
-                                            color: isPhone
-                                                ? primaryColor
-                                                : whiteColor1,
-                                            borderRadius:
-                                                BorderRadius.circular(29)),
-                                        child: Center(
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.call,
-                                                color: isPhone
-                                                    ? whiteColor1
-                                                    : primaryColor,
-                                                size: 18,
-                                              ),
-                                              Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 5,
-                                                        vertical: 10),
-                                                child: Text(
-                                                  "Phone ",
-                                                  style: GoogleFonts.poppins(
-                                                      color: isPhone
-                                                          ? whiteColor
-                                                          : primaryColor,
-                                                      fontWeight:
-                                                          FontWeight.w400,
-                                                      fontSize: 12),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () {
-                                        setState(() {
-                                          isPhone = false;
-                                          _emailController.text = '';
-                                          _passwordController.text = '';
-                                        });
-                                      },
-                                      child: Container(
-                                        margin: const EdgeInsets.symmetric(
-                                            vertical: 5, horizontal: 5),
-                                        decoration: BoxDecoration(
-                                            color: !isPhone
-                                                ? primaryColor
-                                                : whiteColor1,
-                                            borderRadius:
-                                                BorderRadius.circular(29)),
-                                        child: Center(
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.mail,
-                                                color: !isPhone
-                                                    ? whiteColor
-                                                    : primaryColor,
-                                                size: 18,
-                                              ),
-                                              Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 5,
-                                                        vertical: 10),
-                                                child: Text(
-                                                  "Email",
-                                                  style: GoogleFonts.poppins(
-                                                      color: !isPhone
-                                                          ? whiteColor
-                                                          : primaryColor,
-                                                      fontWeight:
-                                                          FontWeight.w400,
-                                                      fontSize: 12),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                           
-                            Visibility(
-                              visible: !isPhone,
+                                                  Visibility(
+                              visible: true,
                               child: TextInputFieldEmailaAddress(
                                   _emailController, "Email address"),
                             ),

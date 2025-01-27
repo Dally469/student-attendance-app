@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -26,11 +27,14 @@ class _HomeState extends State<Home> {
   getCurrentUserInfo() async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     String? userJson = sharedPreferences.getString("currentUser");
+    String? token = sharedPreferences.getString("token");
     Map<String, dynamic> userMap = jsonDecode(userJson!);
     setState(() {
       userFullNames =
           '${userMap['firstName'] ?? '-------'} ${userMap['lastName'] ?? '-------'}';
     });
+
+    print(token);
   }
 
   SchoolClassroomBloc schoolClassroomBloc =
@@ -257,11 +261,11 @@ class _HomeState extends State<Home> {
               Container(
                 margin: const EdgeInsets.only(left: 16.0),
                 child: Text(
-                  'Select Classroom for $selectedService ',
+                  'Select Classroom for  Student $selectedService ',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.poppins(
                       fontSize: 20,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w500,
                       color: primaryColor),
                 ),
               ),
@@ -283,7 +287,7 @@ class _HomeState extends State<Home> {
                               children: [
                                 const SizedBox(height: 20),
                                 Text(
-                                  'Loading classroom for $selectedService',
+                                  'Loading classroom for student $selectedService',
                                   style: GoogleFonts.poppins(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w400,
@@ -387,6 +391,27 @@ class _HomeState extends State<Home> {
                                   ),
                                 ],
                               ),
+                              onTap: () {
+                                String obtainedClassroom = state
+                                    .schoolClassroomModel.data![index].name
+                                    .toString();
+
+                                String obtainedClassroomId = state
+                                    .schoolClassroomModel.data![index].id
+                                    .toString();
+
+                                if (selectedService == "card") {
+                                  context.safeGoNamed(assignCard, params: {
+                                    'classroom': obtainedClassroom,
+                                    'classroomId': obtainedClassroomId
+                                  });
+                                } else {
+                                  context.safeGoNamed(makeAttendance, params: {
+                                    'classroom': obtainedClassroom,
+                                    'classroomId': obtainedClassroomId
+                                  });
+                                }
+                              },
                             ),
                           );
                         },
@@ -427,7 +452,9 @@ class _HomeState extends State<Home> {
                 selectedService = service['service']!;
               });
               _showMotorbikersBottomSheet(context);
-              schoolClassroomBloc.add(FetchSchoolClassroomEvent(token: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbkBzdHVkZW50LmNvbSIsImlhdCI6MTczNzgxMzA5MSwiZXhwIjoxNzM3ODQ5MDkxfQ.SkSR8wVjLIKNQtNTGEnNG6881pOno_CSDpIfyxCRc70"));
+              schoolClassroomBloc.add(FetchSchoolClassroomEvent(
+                  token:
+                      "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbkBzdHVkZW50LmNvbSIsImlhdCI6MTczNzgxMzA5MSwiZXhwIjoxNzM3ODQ5MDkxfQ.SkSR8wVjLIKNQtNTGEnNG6881pOno_CSDpIfyxCRc70"));
             },
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,

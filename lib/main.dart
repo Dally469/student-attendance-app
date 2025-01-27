@@ -4,6 +4,8 @@ import 'package:attendance/api/auth.service.dart';
 import 'package:attendance/routes/routes.provider.dart';
 import 'package:attendance/screens/login.dart';
 import 'package:attendance/screens/splash.screen.dart';
+import 'package:attendance/states/assign.student.card/assign_student_card_bloc.dart';
+import 'package:attendance/states/classroom.student/classroom_student_bloc.dart';
 import 'package:attendance/states/school.classroom/school_classroom_bloc.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:flutter/foundation.dart';
@@ -57,6 +59,12 @@ class _MyAppState extends State<MyApp> {
         BlocProvider<SchoolClassroomBloc>(
             create: (_) =>
                 SchoolClassroomBloc(SchoolClassroomInitial(), AuthService())),
+        BlocProvider<ClassroomStudentBloc>(
+            create: (_) =>
+                ClassroomStudentBloc(ClassroomStudentInitial(), AuthService())),
+        BlocProvider<AssignStudentCardBloc>(
+            create: (_) => AssignStudentCardBloc(
+                AssignStudentCardInitial(), AuthService())),
       ],
       child: MaterialApp.router(
         routerConfig: AppNavigation.router,
