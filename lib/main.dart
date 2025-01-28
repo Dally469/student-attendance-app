@@ -1,11 +1,13 @@
 import 'dart:io';
 
+import 'package:attendance/api/attendance.service.dart';
 import 'package:attendance/api/auth.service.dart';
 import 'package:attendance/routes/routes.provider.dart';
 import 'package:attendance/screens/login.dart';
 import 'package:attendance/screens/splash.screen.dart';
 import 'package:attendance/states/assign.student.card/assign_student_card_bloc.dart';
 import 'package:attendance/states/classroom.student/classroom_student_bloc.dart';
+import 'package:attendance/states/make.attendance/make_attendance_bloc.dart';
 import 'package:attendance/states/school.classroom/school_classroom_bloc.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:flutter/foundation.dart';
@@ -65,6 +67,8 @@ class _MyAppState extends State<MyApp> {
         BlocProvider<AssignStudentCardBloc>(
             create: (_) => AssignStudentCardBloc(
                 AssignStudentCardInitial(), AuthService())),
+        BlocProvider<AttendanceBloc>(
+            create: (_) => AttendanceBloc(AttendanceService())),
       ],
       child: MaterialApp.router(
         routerConfig: AppNavigation.router,

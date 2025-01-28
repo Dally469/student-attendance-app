@@ -1,10 +1,14 @@
 // ignore_for_file: depend_on_referenced_packages
 
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:attendance/models/single.student.model.dart';
 import 'package:attendance/models/student.model.dart';
 import 'package:attendance/models/user.login.model.dart';
 import 'package:flutter/foundation.dart';
+
+import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -87,6 +91,7 @@ class AuthService {
 
     if (response.statusCode == 200) {
       StudentModel schoolClassroomModel = StudentModel.fromJson(results);
+      await saveDataToFile(classroom, results);
 
       return schoolClassroomModel;
     } else if (response.statusCode == 400) {
@@ -97,7 +102,26 @@ class AuthService {
       return schoolClassroomModel;
     }
   }
-  Future<StudentModel> assignCardToStudents(String studentCode, String cardId) async {
+
+  Future<void> saveDataToFile(
+      String classroom, Map<String, dynamic> data) async {
+    try {
+      // Get the app's document directory
+      final directory = await getApplicationDocumentsDirectory();
+      final filePath = '${directory.path}/$classroom.json';
+
+      // Convert the data to JSON format and write it to the file
+      File file = File(filePath);
+      await file.writeAsString(jsonEncode(data));
+
+      print('Data saved to file: $filePath');
+    } catch (e) {
+      print('Error saving data to file: $e');
+    }
+  }
+
+  Future<SingleStudentModel> assignCardToStudents(
+      String studentCode, String cardId) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     String? token = sharedPreferences.getString("token");
 
@@ -106,7 +130,8 @@ class AuthService {
       'Authorization': '${token.toString()}}'
     };
     var response = await http.post(
-        Uri.parse('${dotenv.get('mainUrl')}/api/students/$studentCode/assign-card'),
+        Uri.parse(
+            '${dotenv.get('mainUrl')}/api/students/$studentCode/assign-card'),
         headers: headers,
         body: json.encode({
           'cardId': cardId.toString(),
@@ -116,14 +141,14 @@ class AuthService {
     print(results);
 
     if (response.statusCode == 200) {
-      StudentModel schoolClassroomModel = StudentModel.fromJson(results);
+      SingleStudentModel schoolClassroomModel = SingleStudentModel.fromJson(results);
 
       return schoolClassroomModel;
     } else if (response.statusCode == 400) {
-      StudentModel schoolClassroomModel = StudentModel.fromJson(results);
+      SingleStudentModel schoolClassroomModel = SingleStudentModel.fromJson(results);
       return schoolClassroomModel;
     } else {
-      StudentModel schoolClassroomModel = StudentModel.fromJson(results);
+      SingleStudentModel schoolClassroomModel = SingleStudentModel.fromJson(results);
       return schoolClassroomModel;
     }
   }
