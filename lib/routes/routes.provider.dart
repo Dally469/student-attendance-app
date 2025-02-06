@@ -9,6 +9,8 @@ import 'package:attendance/screens/splash.screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../screens/create_attendance_screen.dart';
+
 class AppNavigation {
   AppNavigation._();
 
@@ -69,6 +71,16 @@ class AppNavigation {
               classroomId: state.uri.queryParameters['classroomId'],
               classroom: state.uri.queryParameters['classroom'],
               attendanceId: state.uri.queryParameters['attendanceId'],
+            ),
+          ),
+
+          GoRoute(
+            path: '/createAttendance',
+            name: createAttendance,
+            builder: (context, state) => CreateAttendanceScreen(
+              key: state.pageKey,
+              classroomId: state.uri.queryParameters['classroomId'],
+            
             ),
           ),
           GoRoute(

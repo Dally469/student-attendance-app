@@ -1,7 +1,11 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:attendance/api/auth.service.dart';
+import 'package:attendance/routes/routes.names.dart';
+import 'package:attendance/routes/routes.provider.dart';
 import 'package:attendance/states/classroom.student/classroom_student_bloc.dart';
 import 'package:attendance/states/make.attendance/make_attendance_bloc.dart';
 import 'package:attendance/utils/colors.dart';
@@ -39,10 +43,23 @@ class _AttendancePageState extends State<AttendancePage> {
   @override
   void initState() {
     super.initState();
-    attendanceBloc = BlocProvider.of<AttendanceBloc>(context);
-    classroomStudentBloc = BlocProvider.of<ClassroomStudentBloc>(context);
 
     checkNfcAvailability();
+  }
+
+  bool _didFetchStudents = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_didFetchStudents) {
+      attendanceBloc = BlocProvider.of<AttendanceBloc>(context);
+      classroomStudentBloc = BlocProvider.of<ClassroomStudentBloc>(context);
+      classroomStudentBloc.add(
+        FetchClassroomStudentEvent(classroom: widget.classroom ?? ""),
+      );
+      _didFetchStudents = true;
+    }
   }
 
   Future<void> checkNfcAvailability() async {
@@ -159,8 +176,6 @@ class _AttendancePageState extends State<AttendancePage> {
     return false;
   }
 
-   
-
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -170,12 +185,20 @@ class _AttendancePageState extends State<AttendancePage> {
           backgroundColor: primaryColor,
           elevation: 0,
           toolbarHeight: 100, // Set the height of the AppBar
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back,
+                color: Colors.white), // Back button icon
+            onPressed: () {
+              context.safeGoNamed(home); // Navigate back
+            },
+          ),
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                "${widget.classroom.toString()}",
-                style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
+                widget.classroom.toString(),
+                style:
+                    const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -218,8 +241,8 @@ class _AttendancePageState extends State<AttendancePage> {
                     children: [
                       Text(
                         state.isOffline
-                            ? 'Attendance marked offline'
-                            : 'Welcome ${state.checkInModel.data?.studentId ?? ""}!',
+                            ? 'Attendance checkout successful'
+                            : 'Welcome ${state.checkInModel.data?.studentName ?? ""}!',
                       ),
                       if (!state.isOffline && state.checkInModel.data != null)
                         Text(
@@ -228,7 +251,8 @@ class _AttendancePageState extends State<AttendancePage> {
                         ),
                     ],
                   ),
-                  backgroundColor: state.isOffline ? Colors.orange : Colors.green,
+                  backgroundColor:
+                      state.isOffline ? Colors.green : Colors.green,
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -262,8 +286,8 @@ class _AttendancePageState extends State<AttendancePage> {
                                 SizedBox(height: 16),
                                 Text(
                                   'NFC is not available on this device',
-                                  style:
-                                      TextStyle(color: Colors.red, fontSize: 18),
+                                  style: TextStyle(
+                                      color: Colors.red, fontSize: 18),
                                 ),
                               ],
                             )
@@ -338,7 +362,8 @@ class _AttendancePageState extends State<AttendancePage> {
                                   child: Icon(Icons.person),
                                 ),
                                 title: Text(
-                                  state.checkInModel.data?.studentId ?? 'Unknown',
+                                  state.checkInModel.data?.studentName ??
+                                      'Unknown',
                                 ),
                                 subtitle: Text(
                                   'Status: ${state.checkInModel.data?.status ?? "Unknown"}',

@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/attendance.dart';
 import '../models/classroom.model.dart';
 
 class AuthService {
@@ -141,15 +142,51 @@ class AuthService {
     print(results);
 
     if (response.statusCode == 200) {
-      SingleStudentModel schoolClassroomModel = SingleStudentModel.fromJson(results);
+      SingleStudentModel schoolClassroomModel =
+          SingleStudentModel.fromJson(results);
 
       return schoolClassroomModel;
     } else if (response.statusCode == 400) {
-      SingleStudentModel schoolClassroomModel = SingleStudentModel.fromJson(results);
+      SingleStudentModel schoolClassroomModel =
+          SingleStudentModel.fromJson(results);
       return schoolClassroomModel;
     } else {
-      SingleStudentModel schoolClassroomModel = SingleStudentModel.fromJson(results);
+      SingleStudentModel schoolClassroomModel =
+          SingleStudentModel.fromJson(results);
       return schoolClassroomModel;
+    }
+  }
+
+  Future<AttendanceModel> createAttendance(String classroomId) async {
+    SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
+    String? token = sharedPreferences.getString("token");
+
+    Map<String, String> headers = {
+      'Content-Type': 'application/json',
+      'Authorization': '${token.toString()}}'
+    };
+
+    var response = await http.post(
+      Uri.parse(
+          '${dotenv.get('mainUrl')}/api/attendance/classroom/$classroomId'),
+      headers: headers,
+    );
+
+    Map<String, dynamic> results = jsonDecode(response.body);
+    print(results);
+
+    if (response.statusCode == 200) {
+      AttendanceModel attendanceModel =
+          AttendanceModel.fromJson(results['data']);
+      return attendanceModel;
+    } else if (response.statusCode == 400) {
+      AttendanceModel attendanceModel =
+          AttendanceModel.fromJson(results['data']);
+      return attendanceModel;
+    } else {
+      AttendanceModel attendanceModel =
+          AttendanceModel.fromJson(results['data']);
+      return attendanceModel;
     }
   }
 }

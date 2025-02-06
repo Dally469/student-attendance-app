@@ -6,6 +6,7 @@ String login = 'login';
 String verify = 'verify';
 String assignCard = 'assignCard';
 String makeAttendance = 'makeAttendance';
+String createAttendance = 'createAttendance';
 String addCard = 'addCard';
 String clientProfile = 'clientProfile';
 String cancelRide = 'cancelRide';

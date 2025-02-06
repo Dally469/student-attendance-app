@@ -41,8 +41,8 @@ class Data {
   String? school;
   String? status;
   String? cardId;
-  bool isCardAvailable = false;
-  String? cardAvailable;
+  bool? isCardAvailable;
+  bool? cardAvailable;
 
   Data(
       {this.id,
@@ -60,7 +60,7 @@ class Data {
       this.school,
       this.status,
       this.cardId,
-      required this.isCardAvailable,
+       this.isCardAvailable,
       this.cardAvailable});
 
   Data.fromJson(Map<String, dynamic> json) {
@@ -79,7 +79,7 @@ class Data {
     school = json['school'];
     status = json['status'];
     cardId = json['cardId'];
-    isCardAvailable = json['isCardAvailable'] ?? false;
+    isCardAvailable = json['isCardAvailable'];
     cardAvailable = json['cardAvailable'];
   }
 

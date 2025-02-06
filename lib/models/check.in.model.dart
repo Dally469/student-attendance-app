@@ -24,6 +24,7 @@ class CheckInModel {
 class CheckInData {
   final String id;
   final String studentId;
+  final String studentName;
   final String classroomId;
   final String attendanceId;
   final String checkInTime;
@@ -36,6 +37,7 @@ class CheckInData {
   CheckInData({
     required this.id,
     required this.studentId,
+    required this.studentName,
     required this.classroomId,
     required this.attendanceId,
     required this.checkInTime,
@@ -50,6 +52,7 @@ class CheckInData {
     return CheckInData(
       id: json['id'] ?? '',
       studentId: json['studentId'] ?? '',
+      studentName: json['studentName'] ?? '',
       classroomId: json['classroomId'] ?? '',
       attendanceId: json['attendanceId'] ?? '',
       checkInTime: json['checkInTime'] ?? '',
@@ -65,6 +68,7 @@ class CheckInData {
     return {
       'id': id,
       'studentId': studentId,
+      'studentName': studentName,
       'classroomId': classroomId,
       'attendanceId': attendanceId,
       'checkInTime': checkInTime,

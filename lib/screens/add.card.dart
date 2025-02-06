@@ -31,7 +31,6 @@ class AssignCardPage extends StatefulWidget {
 class _AssignCardPageState extends State<AssignCardPage> {
   bool isReading = false;
   String? nfcId;
-  String? lastTagInfo;
   late AssignStudentCardBloc studentBloc;
   bool isNfcAvailable = false;
 
@@ -39,33 +38,20 @@ class _AssignCardPageState extends State<AssignCardPage> {
   void initState() {
     super.initState();
     studentBloc = BlocProvider.of<AssignStudentCardBloc>(context);
-    checkNfcAvailability();
+    _checkNfcAvailability();
   }
 
-  Future<void> checkNfcAvailability() async {
+  Future<void> _checkNfcAvailability() async {
     try {
       isNfcAvailable = await NfcManager.instance.isAvailable();
-      setState(() {});
     } catch (e) {
       debugPrint('NFC Availability Error: $e');
-      setState(() {
-        isNfcAvailable = false;
-      });
+      isNfcAvailable = false;
     }
+    setState(() {});
   }
 
-  String _formatTagData(Map<String, dynamic> data) {
-    return data.entries
-        .map((e) =>
-            '${e.key}: ${e.value is List ? _formatBytes(e.value) : e.value}')
-        .join('\n');
-  }
-
-  String _formatBytes(List<int> bytes) {
-    return bytes.map((e) => e.toRadixString(16).padLeft(2, '0')).join(':');
-  }
-
-  Future<void> startNfcSession() async {
+  Future<void> _startNfcSession() async {
     if (!isNfcAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('NFC is not available on this device')),
@@ -73,69 +59,45 @@ class _AssignCardPageState extends State<AssignCardPage> {
       return;
     }
 
-    setState(() {
-      isReading = true;
-      nfcId = null;
-      lastTagInfo = null;
-    });
+    setState(() => isReading = true);
 
     try {
       await NfcManager.instance.startSession(
         onDiscovered: (NfcTag tag) async {
-          try {
-            // Store complete tag information for debugging
-            final Map<String, dynamic> tagData = tag.data;
+          final tagId = tag.data['nfca']?['identifier'] ??
+              tag.data['isodep']?['identifier'] ??
+              tag.data['mifareclassic']?['identifier'] ??
+              tag.data['mifareultralight']?['identifier'];
+
+          if (tagId != null) {
+            final nfcIdHex =
+                tagId.map((e) => e.toRadixString(16).padLeft(2, '0')).join('');
+            debugPrint('NFC ID: $nfcIdHex');
+
+            studentBloc.add(HandleAssignStudentCardEvent(
+              studentCode: widget.studentCode ?? '',
+              cardId: nfcIdHex,
+            ));
+
             setState(() {
-              lastTagInfo = _formatTagData(tagData);
+              nfcId = nfcIdHex;
+              isReading = false;
             });
-            debugPrint('Found NFC tag: $lastTagInfo');
 
-            // Get the ID from the NFC tag
-            final tagId = tag.data['nfca']?['identifier'] ??
-                tag.data['isodep']?['identifier'] ??
-                tag.data['mifareclassic']?['identifier'] ??
-                tag.data['mifareultralight']?['identifier'];
-
-            if (tagId != null) {
-              // Convert bytes to hex string without colons
-              final nfcIdHex = tagId
-                  .map((e) => e.toRadixString(16).padLeft(2, '0'))
-                  .join('');
-              debugPrint('NFC ID: $nfcIdHex');
-              // Dispatch event to BLoC
-              studentBloc.add(HandleAssignStudentCardEvent(
-                studentCode: widget.studentCode ?? '',
-                cardId: nfcIdHex,
-              ));
-
-              setState(() {
-                nfcId = nfcIdHex;
-                isReading = false;
-              });
-
-              // Vibrate and show success message
-              // await HapticFeedback.vibrate();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Card detected: $nfcIdHex')),
-              );
-
-              await NfcManager.instance.stopSession();
-            } else {
-              throw Exception('Could not read card ID');
-            }
-          } catch (e) {
-            debugPrint('Error processing NFC tag: $e');
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error processing card: $e')),
+              SnackBar(content: Text('Card detected: $nfcIdHex')),
             );
+
+            await Future.delayed(const Duration(seconds: 1));
+            await NfcManager.instance.stopSession();
+          } else {
+            throw Exception('Could not read card ID');
           }
         },
       );
     } catch (e) {
-      debugPrint('NFC Session Error: $e');
-      setState(() {
-        isReading = false;
-      });
+      debugPrint('NFC Error: $e');
+      setState(() => isReading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error reading NFC: $e')),
       );
@@ -143,125 +105,138 @@ class _AssignCardPageState extends State<AssignCardPage> {
   }
 
   @override
+  void dispose() {
+    NfcManager.instance.stopSession();
+    super.dispose();
+  }
+
+   Future<bool> _onWillPop() async {
+    Navigator.of(context).pop();
+    return false;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Assign Card',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            'Assign Card',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: Colors.blue,
         ),
-        backgroundColor: Colors.blue,
-      ),
-      body: BlocListener<AssignStudentCardBloc, AssignStudentCardState>(
-        listener: (context, state) {
-          if (state is AssignStudentCardSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Card assigned successfully!')),
-            );
-            Future.delayed(const Duration(seconds: 2), () {
-              context.safeGoNamed(assignCard, params: {
-                'classroom': widget.classroom.toString(),
-                'classroomId': widget.studentId.toString(),
+        body: BlocListener<AssignStudentCardBloc, AssignStudentCardState>(
+          listener: (context, state) {
+            if (state is AssignStudentCardSuccess) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Card assigned successfully!')),
+              );
+              Future.delayed(const Duration(seconds: 2), () {
+                context.safeGoNamed(assignCard, params: {
+                  'classroom': widget.classroom.toString(),
+                  'classroomId': widget.studentId.toString(),
+                });
               });
-            });
-          } else if (state is AssignStudentCardError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error: ${state.message}')),
-            );
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (!isNfcAvailable)
-                const Text(
-                  'NFC is not available on this device',
-                  style: TextStyle(color: Colors.red),
-                )
-              else ...[
-                CircleAvatar(
-                  radius: 100,
-                  backgroundColor: primaryColor.withOpacity(0.1),
-                  backgroundImage: widget.profileImage != null
-                      ? NetworkImage(widget.profileImage.toString())
-                      : null, // Placeholder if no image is available
-                  child: widget.profileImage == null
-                      ? const Icon(Icons.person, color: primaryColor)
-                      : null,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.studentName.toString(),
-                  style: GoogleFonts.poppins(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
+            } else if (state is AssignStudentCardError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error: ${state.message}')),
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (!isNfcAvailable)
+                  const Text(
+                    'NFC is not available on this device',
+                    style: TextStyle(color: Colors.red),
+                  )
+                else ...[
+                  // CircleAvatar(
+                  //   radius: 100,
+                  //   backgroundColor: primaryColor.withOpacity(0.1),
+                  //   backgroundImage: widget.profileImage != null
+                  //       ? NetworkImage(widget.profileImage!)
+                  //       : null,
+                  //   child: widget.profileImage == null
+                  //       ? const Icon(Icons.person, color: primaryColor, size: 80)
+                  //       : null,
+                  // ),
+                  const SizedBox(height: 10),
+                  Text(
+                    widget.studentName ?? 'Unknown Student',
+                    style: GoogleFonts.poppins(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 30.0),
-                  child: Text(
-                    'Place the NFC card on the device to assign to',
-                    style: GoogleFonts.poppins(fontSize: 18),
-                    textAlign: TextAlign.center,
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 30.0),
+                    child: Text(
+                      'Place the NFC card on the device to assign',
+                      style: GoogleFonts.poppins(fontSize: 18),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                BlocBuilder<AssignStudentCardBloc, AssignStudentCardState>(
-                  builder: (context, state) {
-                    if (state is AssignStudentCardLoading || isReading) {
-                      return const Column(
-                        children: [
+                  const SizedBox(height: 24),
+                  BlocBuilder<AssignStudentCardBloc, AssignStudentCardState>(
+                    builder: (context, state) {
+                      if (state is AssignStudentCardLoading || isReading) {
+                        return const Column(
+                          children: [
+                            // CircularProgressIndicator(
+                            //   valueColor:
+                            //       AlwaysStoppedAnimation<Color>(Colors.blue),
+                            //   strokeWidth: 4.0,
+                            // ),
                           SizedBox(
-                            height: 100,
-                            width: 100,
-                            child: CircularProgressIndicator(
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.blue),
-                              strokeWidth: 8.0,
+                              height: 100,
+                              width: 100,
+                              child: CircularProgressIndicator(
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.blue),
+                                strokeWidth: 8.0,
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            Text('Reading NFC card...'),
+                          ],
+                        );
+                      } else if (state is AssignStudentCardSuccess) {
+                        return const Column(
+                          children: [
+                            Icon(Icons.check_circle,
+                                size: 100, color: Colors.green),
+                            SizedBox(height: 16),
+                            Text('Card assigned successfully!'),
+                          ],
+                        );
+                      } else {
+                        return ElevatedButton(
+                          onPressed: _startNfcSession,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 16,
                             ),
                           ),
-                          SizedBox(height: 16),
-                          Text('Reading NFC card...'),
-                        ],
-                      );
-                    } else if (state is AssignStudentCardSuccess) {
-                      return const Column(
-                        children: [
-                          Icon(Icons.check_circle,
-                              size: 100, color: Colors.green),
-                          SizedBox(height: 16),
-                          Text('Card assigned successfully!'),
-                        ],
-                      );
-                    } else {
-                      return ElevatedButton(
-                        onPressed: startNfcSession,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 16,
-                          ),
-                        ),
-                        child: const Text('Start Reading Card'),
-                      );
-                    }
-                  },
-                ),
+                          child: const Text('Start Reading Card'),
+                        );
+                      }
+                    },
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    NfcManager.instance.stopSession();
-    super.dispose();
   }
 }
