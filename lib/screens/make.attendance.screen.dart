@@ -318,7 +318,7 @@ class _AttendancePageState extends State<AttendancePage> {
                             Text(
                               state is AttendanceLoading
                                   ? 'Processing...'
-                                  : 'Tap your card to mark attendance',
+                                  : 'Tap your card to make \nattendance',
                               style: GoogleFonts.poppins(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w500,

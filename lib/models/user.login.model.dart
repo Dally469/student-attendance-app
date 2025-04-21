@@ -6,7 +6,11 @@ class UserLoginModel {
   UserData? data;
 
   UserLoginModel(
-      {this.status,  required this.success, this.message, this.token, this.data});
+      {this.status,
+      required this.success,
+      this.message,
+      this.token,
+      this.data});
 
   UserLoginModel.fromJson(Map<String, dynamic> json) {
     status = json['status'];
@@ -38,6 +42,7 @@ class UserData {
   String? email;
   String? phone;
   String? role;
+  School? school; // Added this field
 
   UserData(
       {this.id,
@@ -47,7 +52,9 @@ class UserData {
       this.lastName,
       this.email,
       this.phone,
-      this.role});
+      this.role,
+      this.school // Added this field
+      });
 
   UserData.fromJson(Map<String, dynamic> json) {
     id = json['id'];
@@ -58,6 +65,9 @@ class UserData {
     email = json['email'];
     phone = json['phone'];
     role = json['role'];
+    school = json['school'] != null
+        ? School.fromJson(json['school'])
+        : null; // Added this line
   }
 
   Map<String, dynamic> toJson() {
@@ -70,6 +80,51 @@ class UserData {
     data['email'] = email;
     data['phone'] = phone;
     data['role'] = role;
+    if (this.school != null) {
+      data['school'] = this.school!.toJson(); // Added this
+    }
+    return data;
+  }
+}
+
+// Added a new class for the School data
+class School {
+  String? id;
+  String? name;
+  String? phone;
+  String? email;
+  String? logo;
+  String? status;
+  String? slogan;
+
+  School(
+      {this.id,
+      this.name,
+      this.phone,
+      this.email,
+      this.logo,
+      this.status,
+      this.slogan});
+
+  School.fromJson(Map<String, dynamic> json) {
+    id = json['id'];
+    name = json['name'];
+    phone = json['phone'];
+    email = json['email'];
+    logo = json['logo'];
+    status = json['status'];
+    slogan = json['slogan'];
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['id'] = id;
+    data['name'] = name;
+    data['phone'] = phone;
+    data['email'] = email;
+    data['logo'] = logo;
+    data['status'] = status;
+    data['slogan'] = slogan;
     return data;
   }
 }

@@ -4,7 +4,7 @@
     <uses-feature android:name="android.hardware.nfc" android:required="true" />
 
     <application
-        android:label="Student Attendance"
+        android:label="Student Card - Attendance"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

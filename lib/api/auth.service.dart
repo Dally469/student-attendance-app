@@ -1,4 +1,4 @@
-// ignore_for_file: depend_on_referenced_packages
+// ignore_for_file: depend_on_referenced_packages, no_leading_underscores_for_local_identifiers
 
 import 'dart:convert';
 import 'dart:io';
@@ -32,10 +32,10 @@ class AuthService {
     Map<String, dynamic> results = jsonDecode(response.body);
     if (response.statusCode == 200) {
       UserLoginModel model = UserLoginModel.fromJson(results);
-
       sharedPreferences.setString('currentUser', jsonEncode(model.data));
+      sharedPreferences.setString('currentSchool', jsonEncode(model.data?.school));
       sharedPreferences.setString('token', jsonEncode(model.token));
-
+      
       return model;
     } else if (response.statusCode == 400) {
       UserLoginModel model = UserLoginModel.fromJson(results);
@@ -46,44 +46,57 @@ class AuthService {
     }
   }
 
-  Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
-    Map<String, String> headers = {
-      'Content-Type': 'application/json',
-      'Authorization': '${token.toString()}}'
-    };
+    
+Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
 
-    var response = await http.get(
-      Uri.parse('${dotenv.get('mainUrl')}/api/classrooms'),
-      headers: headers,
-    );
+  var newToken = token.replaceAll('"', "");
+    _setHeaders() => {
+          'Content-type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': newToken
+        };
 
-    Map<String, dynamic> results = jsonDecode(response.body);
-    if (response.statusCode == 200) {
-      SchoolClassroomModel schoolClassroomModel =
-          SchoolClassroomModel.fromJson(results);
-      return schoolClassroomModel;
-    } else if (response.statusCode == 400) {
-      SchoolClassroomModel schoolClassroomModel =
-          SchoolClassroomModel.fromJson(results);
-      return schoolClassroomModel;
-    } else {
-      SchoolClassroomModel schoolClassroomModel =
-          SchoolClassroomModel.fromJson(results);
-      return schoolClassroomModel;
+    try {
+      final response = await http.get(
+        Uri.parse('${dotenv.get('mainUrl')}/api/classrooms'),
+        headers: _setHeaders(),
+      );
+
+    
+      final Map<String, dynamic> results = jsonDecode(response.body);
+      print("=================== RESULT ===============");
+      print(results.entries);
+
+      // Always parse the response into the model regardless of status code
+      // The success/failure is handled by checking the 'success' field in the model
+      return SchoolClassroomModel.fromJson(results);
+    } catch (e) {
+      // Handle network or parsing errors
+      print("Error fetching classrooms: $e");
+      // Return a model with error information
+      return SchoolClassroomModel(
+        status: 500,
+        success: false,
+        message: "Failed to fetch classrooms: $e",
+        data: [],
+      );
     }
   }
 
   Future<StudentModel> fetchStudents(String classroom) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
-    String? token = sharedPreferences.getString("token");
+    String token = sharedPreferences.getString("token") ?? "";
 
-    Map<String, String> headers = {
-      'Content-Type': 'application/json',
-      'Authorization': '${token.toString()}}'
-    };
+    var newToken = token.replaceAll('"', "");
+    _setHeaders() => {
+          'Content-type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': newToken
+        };
+
     var response = await http.post(
         Uri.parse('${dotenv.get('mainUrl')}/api/students/filter/classroom'),
-        headers: headers,
+        headers: _setHeaders(),
         body: json.encode({
           'classroom': classroom.toString(),
         }));
@@ -124,16 +137,18 @@ class AuthService {
   Future<SingleStudentModel> assignCardToStudents(
       String studentCode, String cardId) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
-    String? token = sharedPreferences.getString("token");
+    String token = sharedPreferences.getString("token") ?? "";
 
-    Map<String, String> headers = {
-      'Content-Type': 'application/json',
-      'Authorization': '${token.toString()}}'
-    };
+       var newToken = token.replaceAll('"', "");
+    _setHeaders() => {
+          'Content-type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': newToken
+        };
     var response = await http.post(
         Uri.parse(
             '${dotenv.get('mainUrl')}/api/students/$studentCode/assign-card'),
-        headers: headers,
+        headers: _setHeaders(),
         body: json.encode({
           'cardId': cardId.toString(),
         }));
@@ -159,17 +174,20 @@ class AuthService {
 
   Future<AttendanceModel> createAttendance(String classroomId) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
-    String? token = sharedPreferences.getString("token");
+    String? token = sharedPreferences.getString("token") ?? "";
 
-    Map<String, String> headers = {
-      'Content-Type': 'application/json',
-      'Authorization': '${token.toString()}}'
-    };
+  
+    var newToken = token.replaceAll('"', "");
+    _setHeaders() => {
+          'Content-type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': newToken
+        };
 
     var response = await http.post(
       Uri.parse(
           '${dotenv.get('mainUrl')}/api/attendance/classroom/$classroomId'),
-      headers: headers,
+      headers: _setHeaders(),
     );
 
     Map<String, dynamic> results = jsonDecode(response.body);

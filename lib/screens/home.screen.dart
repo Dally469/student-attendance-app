@@ -2,7 +2,6 @@
 
 import 'dart:convert';
 
-import 'package:attendance/api/auth.service.dart';
 import 'package:attendance/models/classroom.model.dart';
 import 'package:attendance/routes/routes.names.dart';
 import 'package:attendance/routes/routes.provider.dart';
@@ -14,7 +13,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,7 +27,7 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  String? userFullNames;
+  String? userFullNames, schoolToken, schoolName, schoolLogo;
   String? selectedService;
   String? obtainedClassroomId;
   String? obtainedClassroom;
@@ -57,11 +55,22 @@ class _HomeState extends State<Home> {
       SharedPreferences sharedPreferences =
           await SharedPreferences.getInstance();
       String? userJson = sharedPreferences.getString("currentUser");
+      String? schoolJson = sharedPreferences.getString("currentSchool");
+      String? tokenJson = sharedPreferences.getString("token");
       if (userJson != null) {
         Map<String, dynamic> userMap = jsonDecode(userJson);
+        Map<String, dynamic> schoolMap = jsonDecode(schoolJson!);
         setState(() {
           userFullNames =
               '${userMap['firstName'] ?? '---'} ${userMap['lastName'] ?? '---'}';
+          schoolToken = tokenJson;
+          print(schoolMap['name']);
+
+          // Extract school name from user data
+          if (userMap.containsKey('school') && userMap['school'] != null) {
+            schoolName = userMap['school']['name'];
+            schoolLogo = userMap['school']['logo'];
+          }
         });
       }
     } catch (e) {
@@ -75,53 +84,60 @@ class _HomeState extends State<Home> {
       elevation: 0,
       child: Column(
         children: [
-          DrawerHeader(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  const SizedBox(width: 10),
-                  Container(
-                    margin: const EdgeInsets.only(top: 40),
-                    width: 150,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Welcome,',
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 3,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w300,
-                            fontSize: 16,
-                          ),
-                        ),
-                        SizedBox(
-                          height: 50,
-                          child: Text(
-                            userFullNames ?? '---',
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 3,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+          UserAccountsDrawerHeader(
+            decoration: const BoxDecoration(
+              color: primaryColor,
+            ),
+            currentAccountPicture: CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Text(
+                userFullNames?.isNotEmpty == true
+                    ? userFullNames![0].toUpperCase()
+                    : "U",
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor,
+                ),
+              ),
+            ),
+            accountName: Text(
+              userFullNames ?? '---',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+                fontSize: 16,
+              ),
+            ),
+            accountEmail: Text(
+              schoolName ?? '---',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.w300,
               ),
             ),
           ),
+          const SizedBox(height: 10),
           ListTile(
             leading: const Icon(
-              Icons.request_page,
+              Icons.dashboard,
+              color: Colors.white,
+            ),
+            title: const Text(
+              'Dashboard',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w300,
+                fontSize: 18,
+              ),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.history,
               color: Colors.white,
             ),
             title: const Text(
@@ -137,7 +153,27 @@ class _HomeState extends State<Home> {
               context.safeGoNamed(myRequests);
             },
           ),
+          const Divider(color: Colors.white30),
+          ListTile(
+            leading: const Icon(
+              Icons.settings,
+              color: Colors.white,
+            ),
+            title: const Text(
+              'Settings',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w300,
+                fontSize: 18,
+              ),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              // Add navigation to settings
+            },
+          ),
           const Spacer(),
+          const Divider(color: Colors.white30),
           ListTile(
             leading: const Icon(
               Icons.logout,
@@ -161,12 +197,31 @@ class _HomeState extends State<Home> {
 
   Future<void> _handleLogout() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
-      if (mounted) {
-        Navigator.pop(context);
-        context.safeGoNamed(splash);
-      }
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.clear();
+                if (mounted) {
+                  // Navigator.pop(context);
+                  context.safeGoNamed(splash);
+                }
+              },
+              child: const Text('Logout', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      );
     } catch (e) {
       debugPrint('Error during logout: $e');
     }
@@ -193,18 +248,27 @@ class _HomeState extends State<Home> {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                margin: const EdgeInsets.only(left: 16.0),
-                child: Text(
-                  'Select Classroom for $selectedService',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: blackColor,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Select Classroom for ${selectedService == "card" ? "Card Assignment" : "Attendance"}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: blackColor,
+                      ),
+                    ),
                   ),
-                ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.grey),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 10),
               _buildClassroomList(),
             ],
           ),
@@ -218,7 +282,10 @@ class _HomeState extends State<Home> {
       listener: (context, state) {
         if (state is SchoolClassroomError) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       },
@@ -232,37 +299,40 @@ class _HomeState extends State<Home> {
           }
           return _buildClassroomListContent(state);
         }
-        return const SizedBox.shrink();
+        return const Center(
+          child: Text("An error occurred. Please try again."),
+        );
       },
     );
   }
 
   Widget _buildLoadingState() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 70.0),
-      child: Column(
-        children: [
-          Text(
-            'Loading classrooms...',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.w400,
+    return Expanded(
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SpinKitDoubleBounce(
+              color: primaryColor,
+              size: 40,
             ),
-          ),
-          const SizedBox(height: 20),
-          const SpinKitDoubleBounce(
-            color: primaryColor,
-            size: 40,
-          ),
-        ],
+            const SizedBox(height: 20),
+            Text(
+              'Loading classrooms...',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 70.0),
+    return Expanded(
+      child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -273,7 +343,7 @@ class _HomeState extends State<Home> {
               ),
               padding: const EdgeInsets.all(20),
               child: const Icon(
-                Icons.inbox,
+                Icons.category_outlined,
                 size: 48,
                 color: Colors.grey,
               ),
@@ -282,6 +352,15 @@ class _HomeState extends State<Home> {
             Text(
               'No Classrooms Found',
               style: GoogleFonts.poppins(fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please contact your administrator to add classrooms',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -300,16 +379,18 @@ class _HomeState extends State<Home> {
       ),
     );
   }
+
   void _handleAttendanceStateChange(
       BuildContext context, AttendanceState state) {
     if (state is AttendanceSuccess) {
       // Store the new attendance ID
       SharedPreferences.getInstance().then((prefs) {
-        prefs.setString(
-            'active_attendance_$obtainedClassroomId', state.attendanceModel.id.toString());
+        prefs.setString('active_attendance_$obtainedClassroomId',
+            state.attendanceModel.id.toString());
       });
 
       // Navigate to attendance screen
+      Navigator.pop(context); // Close the bottom sheet
       context.safeGoNamed(
         makeAttendance,
         params: {
@@ -320,21 +401,25 @@ class _HomeState extends State<Home> {
       );
     } else if (state is AttendanceError) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(state.message)),
+        SnackBar(
+          content: Text(state.message),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
-  Widget _buildClassroomCard(Data classroom) {
+
+  Widget _buildClassroomCard(Classroom classroom) {
     return BlocConsumer<CreateAttendanceBloc, AttendanceState>(
-      listener: _handleAttendanceStateChange, // Add it here
+      listener: _handleAttendanceStateChange,
       builder: (context, state) {
+        bool isLoading =
+            state is AttendanceLoading && obtainedClassroomId == classroom.id;
         return Container(
           margin: const EdgeInsets.symmetric(vertical: 8),
-          padding: const EdgeInsets.symmetric(vertical: 5),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: whiteColor1, width: 2),
+            borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
                 color: Colors.grey.withOpacity(0.1),
@@ -345,47 +430,70 @@ class _HomeState extends State<Home> {
             ],
           ),
           child: ListTile(
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        classroom.name ?? 'Unknown Class',
-                        style: GoogleFonts.poppins(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w500,
-                          color: greenColor,
-                        ),
-                      ),
-                      Text(
-                        classroom.school?.name ?? 'Unknown School',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w300,
-                        ),
-                      ),
-                    ],
+            contentPadding: const EdgeInsets.all(12),
+            leading: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: primaryColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(
+                child: Text(
+                  classroom.name?.substring(0, 1) ?? 'C',
+                  style: GoogleFonts.poppins(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
                   ),
                 ),
-              ],
+              ),
             ),
-            onTap: () {
-              if (selectedService == "card") {
-                _handleCardAssignment(classroom);
-              } else {
-                _handleAttendanceCreation(classroom);
-              }
-            },
+            title: Text(
+              classroom.name ?? 'Unknown Class',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: blackColor,
+              ),
+            ),
+            subtitle: Text(
+              classroom.school?.name ?? 'Unknown School',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w300,
+                color: Colors.grey,
+              ),
+            ),
+            trailing: isLoading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                    ),
+                  )
+                : const Icon(
+                    Icons.chevron_right,
+                    color: primaryColor,
+                  ),
+            onTap: isLoading
+                ? null
+                : () {
+                    if (selectedService == "card") {
+                      _handleCardAssignment(classroom);
+                    } else {
+                      _handleAttendanceCreation(classroom);
+                    }
+                  },
           ),
         );
       },
     );
   }
 
-  Future<void> _handleAttendanceCreation(Data classroom) async {
+  Future<void> _handleAttendanceCreation(Classroom classroom) async {
     if (isCreatingAttendance) return;
 
     final classroomId = classroom.id;
@@ -393,7 +501,10 @@ class _HomeState extends State<Home> {
 
     if (classroomId == null || className == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid classroom data')),
+        const SnackBar(
+          content: Text('Invalid classroom data'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -409,9 +520,8 @@ class _HomeState extends State<Home> {
       final existingAttendanceId =
           prefs.getString('active_attendance_$classroomId');
 
-          print(existingAttendanceId);
-
       if (existingAttendanceId != null) {
+        Navigator.pop(context); // Close the bottom sheet
         if (mounted) {
           context.safeGoNamed(
             makeAttendance,
@@ -431,7 +541,10 @@ class _HomeState extends State<Home> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating attendance: ${e.toString()}')),
+          SnackBar(
+            content: Text('Error creating attendance: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -441,12 +554,8 @@ class _HomeState extends State<Home> {
     }
   }
 
-
-  // OLD
-
-
-
-  void _handleCardAssignment(Data classroom) {
+  void _handleCardAssignment(Classroom classroom) {
+    Navigator.pop(context); // Close the bottom sheet
     context.safeGoNamed(
       assignCard,
       params: {
@@ -456,59 +565,76 @@ class _HomeState extends State<Home> {
     );
   }
 
-  Widget _buildServiceRow(
-      BuildContext context, List<Map<String, String>> services) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: services.map((service) {
-        return Container(
-          margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-          width: MediaQuery.of(context).size.width,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              foregroundColor: Colors.black,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10.0),
-                side: const BorderSide(color: Colors.grey, width: 2),
+  Widget _buildServiceCard(String title, String image, String service) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          setState(() {
+            selectedService = service;
+          });
+          _showClassroomBottomSheet(context);
+          schoolClassroomBloc
+              .add(FetchSchoolClassroomEvent(token: schoolToken!));
+        },
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Image.asset(
+                image,
+                width: 60,
+                height: 60,
               ),
-              fixedSize: const Size(double.infinity, 150),
-            ),
-            onPressed: () {
-              setState(() {
-                selectedService = service['service'];
-              });
-              _showClassroomBottomSheet(context);
-              schoolClassroomBloc.add(FetchSchoolClassroomEvent(token: 'we'));
-            },
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                Image.asset(
-                  service['image']!,
-                  width: 80,
-                  height: 80,
+              const SizedBox(height: 10),
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: blackColor,
                 ),
-                const SizedBox(width: 15),
-                SizedBox(
-                  width: 200,
-                  child: Text(
-                    service['title']!,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 3,
-                    style: const TextStyle(
-                      fontSize: 23,
-                      fontWeight: FontWeight.bold,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                service == "card"
+                    ? "Assign RFID cards to students"
+                    : "Record student attendance",
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 5),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      "Start",
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
-        );
-      }).toList(),
+        ),
+      ),
     );
   }
 
@@ -521,69 +647,139 @@ class _HomeState extends State<Home> {
           backgroundColor: primaryColor,
           elevation: 0,
           title: const Text("STUDENT ATTENDANCE"),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                // Refresh data if needed
+                getCurrentUserInfo();
+              },
+            ),
+          ],
         ),
         drawer: _buildDrawer(context),
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: Image.asset(
-                "assets/images/backparttern.png",
-                color: Colors.black.withOpacity(0.3),
-                colorBlendMode: BlendMode.srcATop,
-                fit: BoxFit.cover,
-              ),
-            ),
-            Positioned.fill(
-              child: Container(
-                color: whiteColor,
-              ),
-            ),
-            SingleChildScrollView(
-              child: Center(
+        body: SafeArea(
+          child: Column(
+            children: [
+              // School info header
+              // School info header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 3,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 20),
-                    Container(
-                      margin: const EdgeInsets.only(left: 20.0),
-                      child: Text(
-                        'Welcome ${userFullNames ?? ""}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          color: blackColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                    Row(
                       children: [
-                        _buildServiceRow(
-                          context,
-                          [
-                            {
-                              "title": "Assign Student Card",
-                              "image": "assets/images/assign-card.png",
-                              "service": "card",
-                            },
-                            {
-                              "title": "Make Student Attendance",
-                              "image": "assets/images/attended.png",
-                              "service": "attendance",
-                            },
-                          ],
+                        // Use school logo if available, otherwise use school icon
+                        schoolLogo != null && schoolLogo!.isNotEmpty
+                            ? Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  image: DecorationImage(
+                                    image: NetworkImage(schoolLogo!),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.school,
+                                  color: primaryColor,
+                                  size: 24,
+                                ),
+                              ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                schoolName ?? 'School Name',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                'Welcome, ${userFullNames ?? "User"}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 60),
                       ],
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+
+              // Main content
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Services',
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: blackColor,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Service cards
+                      Expanded(
+                        child: GridView.count(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          children: [
+                            _buildServiceCard(
+                              "Assign Card",
+                              "assets/images/assign-card.png",
+                              "card",
+                            ),
+                            _buildServiceCard(
+                              "Mark Attendance",
+                              "assets/images/attended.png",
+                              "attendance",
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         bottomSheet: Container(
           color: whiteColor,

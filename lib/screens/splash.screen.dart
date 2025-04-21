@@ -24,7 +24,7 @@ class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late List<Animation<Offset>> _animations;
   late UserData user;
-  var json;
+  var json, jsonToken;
   String? jsonCheck, jsonCode, jsonCheckProfile, token;
   @override
   void initState() {
@@ -67,6 +67,7 @@ class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
   startTime() async {
     final prefs = await SharedPreferences.getInstance();
     json = prefs.getString('currentUser') ?? 'no';
+    jsonToken = prefs.getString('token') ?? 'no';
     jsonCheck = prefs.getString('currentUser') ?? 'no';
     var duration = const Duration(milliseconds: 100);
 
@@ -77,6 +78,7 @@ class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
       user = UserData.fromJson(map);
       if (kDebugMode) {
         print("USER $json");
+        print("TOKEN  $jsonToken");
       }
       var duration = const Duration(seconds: 2);
       return Timer(duration, navigationPage);

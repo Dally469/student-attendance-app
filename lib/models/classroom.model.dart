@@ -1,97 +1,76 @@
 class SchoolClassroomModel {
-  int? status;
-  bool success = false;
-  String? message;
-  List<Data>? data;
+  final int status;
+  final bool success;
+  final String message;
+  final List<Classroom> data;
 
-  SchoolClassroomModel({this.status, required this.success, this.message, this.data});
+  SchoolClassroomModel({
+    required this.status,
+    required this.success,
+    required this.message,
+    required this.data,
+  });
 
-  SchoolClassroomModel.fromJson(Map<String, dynamic> json) {
-    status = json['status'];
-    success = json['success'] ?? false;
-    message = json['message'];
-    if (json['data'] != null) {
-      data = <Data>[];
-      json['data'].forEach((v) {
-        data!.add(Data.fromJson(v));
-      });
-    }
-  }
-
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = <String, dynamic>{};
-    data['status'] = status;
-    data['success'] = success;
-    data['message'] = message;
-    if (this.data != null) {
-      data['data'] = this.data!.map((v) => v.toJson()).toList();
-    }
-    return data;
+  factory SchoolClassroomModel.fromJson(Map<String, dynamic> json) {
+    return SchoolClassroomModel(
+      status: json['status'],
+      success: json['success'],
+      message: json['message'],
+      data: (json['data'] as List)
+          .map((item) => Classroom.fromJson(item))
+          .toList(),
+    );
   }
 }
 
-class Data {
-  String? id;
-  School? school;
-  String? name;
+class Classroom {
+  final String id;
+  final School school;
+  final String name;
 
-  Data({this.id, this.school, this.name});
+  Classroom({
+    required this.id,
+    required this.school,
+    required this.name,
+  });
 
-  Data.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    school =
-        json['school'] != null ? School.fromJson(json['school']) : null;
-    name = json['name'];
-  }
-
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = <String, dynamic>{};
-    data['id'] = id;
-    if (school != null) {
-      data['school'] = school!.toJson();
-    }
-    data['name'] = name;
-    return data;
+  factory Classroom.fromJson(Map<String, dynamic> json) {
+    return Classroom(
+      id: json['id'],
+      school: School.fromJson(json['school']),
+      name: json['name'],
+    );
   }
 }
 
 class School {
-  String? id;
-  String? name;
-  String? phone;
-  String? email;
-  String? logo;
-  String? status;
-  String? slogan;
+  final String id;
+  final String name;
+  final String phone;
+  final String email;
+  final String logo;
+  final String status;
+  final String slogan;
 
-  School(
-      {this.id,
-      this.name,
-      this.phone,
-      this.email,
-      this.logo,
-      this.status,
-      this.slogan});
+  School({
+    required this.id,
+    required this.name,
+    required this.phone,
+    required this.email,
+    required this.logo,
+    required this.status,
+    required this.slogan,
+  });
 
-  School.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    name = json['name'];
-    phone = json['phone'];
-    email = json['email'];
-    logo = json['logo'];
-    status = json['status'];
-    slogan = json['slogan'];
-  }
-
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = <String, dynamic>{};
-    data['id'] = id;
-    data['name'] = name;
-    data['phone'] = phone;
-    data['email'] = email;
-    data['logo'] = logo;
-    data['status'] = status;
-    data['slogan'] = slogan;
-    return data;
+  factory School.fromJson(Map<String, dynamic> json) {
+    return School(
+      id: json['id'],
+      name: json['name'],
+      phone: json['phone'],
+      email: json['email'],
+      logo: json['logo'],
+      status: json['status'],
+      slogan: json['slogan'],
+    );
   }
 }
