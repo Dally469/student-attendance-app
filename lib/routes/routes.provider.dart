@@ -66,12 +66,25 @@ class AppNavigation {
           GoRoute(
             path: '/makeAttendance',
             name: makeAttendance,
-            builder: (context, state) => AttendancePage(
-              key: state.pageKey,
-              classroomId: state.uri.queryParameters['classroomId'],
-              classroom: state.uri.queryParameters['classroom'],
-              attendanceId: state.uri.queryParameters['attendanceId'],
-            ),
+            builder: (context, state) {
+              // Extract parameters from query
+              final classroomId = state.uri.queryParameters['classroomId'] ?? '';
+              final classroom = state.uri.queryParameters['classroom'] ?? '';
+              final attendanceId = state.uri.queryParameters['attendanceId'] ?? '';
+              
+              // Log navigation for debugging
+              debugPrint('Navigating to MakeAttendance with:');
+              debugPrint('ClassroomID: $classroomId');
+              debugPrint('Classroom: $classroom');
+              debugPrint('AttendanceID: $attendanceId');
+              
+              return AttendancePage(
+                key: state.pageKey,
+                classroomId: classroomId,
+                classroom: classroom,
+                attendanceId: attendanceId,
+              );
+            },
           ),
 
           GoRoute(

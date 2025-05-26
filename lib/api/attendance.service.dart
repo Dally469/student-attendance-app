@@ -5,7 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import '../models/check.in.model.dart';
+import '../models/check.in.model.dart' as legacy;
+import '../models/check_in.dart';
 import '../models/offline_check_in.dart';
 
 class AttendanceService {
@@ -21,7 +22,31 @@ class AttendanceService {
     }
   }
 
-  Future<CheckInModel> markAttendance({
+  // Method for checking in a student - wrapper for compatibility with controller
+  Future<CheckInModel> checkInStudent(String studentId, String classroomId, String attendanceId) async {
+    // Call the legacy method and convert the result
+    legacy.CheckInModel legacyResult = await markAttendance(
+      studentId: studentId,
+      classroomId: classroomId,
+      attendanceId: attendanceId,
+    );
+    
+    // Convert legacy model to new model
+    return CheckInModel(
+      success: legacyResult.success,
+      message: legacyResult.message,
+      data: legacyResult.data != null ? CheckInData(
+        id: legacyResult.data?.id,
+        studentId: legacyResult.data?.studentId,
+        studentName: legacyResult.data?.studentName,
+        checkInTime: legacyResult.data?.checkInTime,
+        status: legacyResult.data?.status,
+        attendanceId: legacyResult.data?.attendanceId,
+      ) : null,
+    );
+  }
+  
+  Future<legacy.CheckInModel> markAttendance({
     required String studentId,
     required String classroomId,
     required String attendanceId,
@@ -53,7 +78,7 @@ class AttendanceService {
         print(results);
 
         if (response.statusCode == 200) {
-          return CheckInModel.fromJson(results);
+          return legacy.CheckInModel.fromJson(results);
         } else {
           // Store offline if API call fails
           await saveOfflineCheckIn(OfflineCheckIn(
@@ -63,7 +88,7 @@ class AttendanceService {
             timestamp: DateTime.now(),
           ));
 
-          return CheckInModel(
+          return legacy.CheckInModel(
             success: false,
             status: response.statusCode,
             message: results['message'] ?? 'Failed to check in',
@@ -78,14 +103,14 @@ class AttendanceService {
           timestamp: DateTime.now(),
         ));
 
-        return CheckInModel(
+        return legacy.CheckInModel(
           success: true,
           status: 200,
           message: 'Stored offline, will sync when online',
         );
       }
     } catch (e) {
-      return CheckInModel(
+      return legacy.CheckInModel(
         success: false,
         status: 500,
         message: 'Error: ${e.toString()}',

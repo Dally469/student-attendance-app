@@ -135,7 +135,7 @@ Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
   }
 
   Future<SingleStudentModel> assignCardToStudents(
-      String studentCode, String cardId) async {
+      String studentId, String cardId) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     String token = sharedPreferences.getString("token") ?? "";
 
@@ -147,7 +147,7 @@ Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
         };
     var response = await http.post(
         Uri.parse(
-            '${dotenv.get('mainUrl')}/api/students/$studentCode/assign-card'),
+            '${dotenv.get('mainUrl')}/api/students/$studentId/assign-card'),
         headers: _setHeaders(),
         body: json.encode({
           'cardId': cardId.toString(),
@@ -193,18 +193,14 @@ Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
     Map<String, dynamic> results = jsonDecode(response.body);
     print(results);
 
-    if (response.statusCode == 200) {
-      AttendanceModel attendanceModel =
-          AttendanceModel.fromJson(results['data']);
-      return attendanceModel;
-    } else if (response.statusCode == 400) {
-      AttendanceModel attendanceModel =
-          AttendanceModel.fromJson(results['data']);
-      return attendanceModel;
-    } else {
-      AttendanceModel attendanceModel =
-          AttendanceModel.fromJson(results['data']);
-      return attendanceModel;
+    // Parse the response using the updated model structure
+    AttendanceModel attendanceModel = AttendanceModel.fromJson(results);
+    
+    // Set success status based on HTTP status code if not already set
+    if (attendanceModel.success == null) {
+      attendanceModel.success = response.statusCode >= 200 && response.statusCode < 300;
     }
+    
+    return attendanceModel;
   }
 }

@@ -3,19 +3,15 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:attendance/api/auth.service.dart';
+import 'package:attendance/controllers/attendance_controller.dart';
+import 'package:attendance/controllers/classroom_student_controller.dart';
 import 'package:attendance/routes/routes.names.dart';
-import 'package:attendance/routes/routes.provider.dart';
-import 'package:attendance/states/classroom.student/classroom_student_bloc.dart';
-import 'package:attendance/states/make.attendance/make_attendance_bloc.dart';
-import 'package:attendance/utils/colors.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:path_provider/path_provider.dart';
-
-import 'package:connectivity_plus/connectivity_plus.dart';
 
 class AttendancePage extends StatefulWidget {
   final String? classroomId;
@@ -30,35 +26,153 @@ class AttendancePage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _AttendancePageState createState() => _AttendancePageState();
+  State<AttendancePage> createState() => _AttendancePageState();
 }
 
-class _AttendancePageState extends State<AttendancePage> {
+class _AttendancePageState extends State<AttendancePage> with SingleTickerProviderStateMixin {
+  // NFC scanning states
   bool isReading = false;
   bool isNfcAvailable = false;
-  late AttendanceBloc attendanceBloc;
-  ClassroomStudentBloc classroomStudentBloc =
-      ClassroomStudentBloc(ClassroomStudentInitial(), AuthService());
+  bool continuousScanning = true; // Flag to control continuous scanning
+  
+  // Animation controller for scan effect
+  late AnimationController _animationController;
+  late Animation<double> _pulseAnimation;
+  
+  // GetX controllers
+  final AttendanceController _attendanceController = Get.find<AttendanceController>();
+  final ClassroomStudentController _classroomStudentController = Get.find<ClassroomStudentController>();
 
   @override
   void initState() {
     super.initState();
-
+    
+    // Setup animation for the NFC scanning effect
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    
+    // Validate required parameters
+    _validateAndRedirectIfNeeded();
+    
+    // Initialize NFC
     checkNfcAvailability();
+    
+    // Fetch students data using GetX controller
+    if (widget.classroom != null && widget.classroom!.isNotEmpty) {
+      _classroomStudentController.getStudentsByClassroomId(widget.classroom!);
+    }
+    
+    // Print debug info
+    print('MakeAttendance screen initialized with:');
+    print('ClassroomID: ${widget.classroomId}');
+    print('Classroom: ${widget.classroom}');
+    print('AttendanceID: ${widget.attendanceId}');
+    
+    _setupControllerListeners();
+  }
+  
+  void _setupControllerListeners() {
+    // Listen for success messages from the controller
+    ever(_attendanceController.successMessage, (message) {
+      if (message.isNotEmpty) {
+        // Wait a moment to ensure UI is stable
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            Get.snackbar(
+              'Success',
+              message,
+              backgroundColor: Colors.green,
+              colorText: Colors.white,
+              snackPosition: SnackPosition.BOTTOM,
+              duration: const Duration(seconds: 2),
+            );
+            
+            // Increment check-in counter
+            _attendanceController.checkInCount.value++;
+          }
+        });
+      }
+    });
+    
+    // Listen for error messages from the controller
+    ever(_attendanceController.errorMessage, (message) {
+      if (message.isNotEmpty) {
+        // Wait a moment to ensure UI is stable
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            Get.snackbar(
+              'Error',
+              message,
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+              snackPosition: SnackPosition.BOTTOM,
+              duration: const Duration(seconds: 3),
+            );
+          }
+        });
+      }
+    });
+    
+    // Listen for last checked-in student to update UI
+    ever(_attendanceController.lastCheckedInStudent, (studentId) {
+      if (studentId.isNotEmpty) {
+        // Update UI or perform any actions when a student is checked in
+        print('Student checked in: $studentId');
+      }
+    });
   }
 
-  bool _didFetchStudents = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_didFetchStudents) {
-      attendanceBloc = BlocProvider.of<AttendanceBloc>(context);
-      classroomStudentBloc = BlocProvider.of<ClassroomStudentBloc>(context);
-      classroomStudentBloc.add(
-        FetchClassroomStudentEvent(classroom: widget.classroom ?? ""),
-      );
-      _didFetchStudents = true;
+  // Validate parameters and redirect if needed
+  void _validateAndRedirectIfNeeded() {
+    // Check if we have all the required parameters
+    if (widget.attendanceId == null || widget.attendanceId!.isEmpty) {
+      print('Missing attendance ID - checking controller');
+      
+      // Try to get from controller
+      final attendanceId = _attendanceController.getAttendanceId();
+      
+      if (attendanceId.isNotEmpty) {
+        print('Found attendance ID in controller: $attendanceId');
+        
+        // We have the ID from controller, but need to redirect to include it in URL
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Get.offAndToNamed(
+            makeAttendance,
+            parameters: {
+              'classroomId': widget.classroomId ?? '',
+              'classroom': widget.classroom ?? '',
+              'attendanceId': attendanceId,
+            }
+          );
+        });
+        return;
+      }
+      
+      // If we can't get the attendance ID, show an error and go back to home
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.snackbar(
+          'Error',
+          'Missing attendance ID. Please create attendance again.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 3),
+        );
+        
+        // Delay navigation slightly to show the snackbar
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          Get.offAllNamed(home);
+        });
+      });
     }
   }
 
@@ -76,11 +190,16 @@ class _AttendancePageState extends State<AttendancePage> {
       });
     }
   }
-
+  
+  // Function to handle continuous NFC scanning
   Future<void> startNfcSession() async {
     if (!isNfcAvailable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('NFC is not available on this device')),
+      Get.snackbar(
+        'NFC Error',
+        'NFC is not available on this device',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
       );
       return;
     }
@@ -90,45 +209,102 @@ class _AttendancePageState extends State<AttendancePage> {
     });
 
     try {
+      // Stop any existing NFC session first
+      await NfcManager.instance.stopSession();
+      
+      print('Starting NFC session for continuous scanning');
+      
       await NfcManager.instance.startSession(
         onDiscovered: (NfcTag tag) async {
           try {
+            // Extract the tag ID
             final tagId = tag.data['nfca']?['identifier'] ??
                 tag.data['isodep']?['identifier'] ??
                 tag.data['mifareclassic']?['identifier'] ??
                 tag.data['mifareultralight']?['identifier'];
 
             if (tagId != null) {
+              // Convert byte array to hex string
               final cardId = tagId
                   .map((e) => e.toRadixString(16).padLeft(2, '0'))
                   .join('');
+                  
+              print('Card detected: $cardId');
 
-              // Get student ID from card ID using your card mapping service
-              // For now, we'll assume you have a method to get this
+              // Get student ID from card ID
               final studentId = await getStudentIdFromCard(
                   widget.classroom.toString(), cardId);
 
               if (studentId != null) {
-                attendanceBloc.add(CheckInEvent(
+                print('Found student with ID: $studentId');
+                
+                // Process the check-in with the controller
+                await _attendanceController.checkInStudent(
                   studentId: studentId,
                   classroomId: widget.classroomId.toString(),
                   attendanceId: widget.attendanceId.toString(),
-                ));
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Card not registered to any student'),
-                    backgroundColor: Colors.orange,
-                  ),
                 );
+                
+                // Temporarily stop the session to give feedback
+                await NfcManager.instance.stopSession();
+                
+                // Vibrate to give tactile feedback for successful scan
+                HapticFeedback.mediumImpact();
+                
+                // Give the system a short break to process and show feedback
+                await Future.delayed(const Duration(milliseconds: 1500));
+                
+                // Restart the NFC session for continuous scanning
+                if (continuousScanning && mounted) {
+                  startNfcSession();
+                }
+              } else {
+                // Card not registered to any student
+                // Temporarily stop the session to give feedback
+                await NfcManager.instance.stopSession();
+                
+                // Vibrate to indicate error
+                HapticFeedback.heavyImpact();
+                
+                Get.snackbar(
+                  'Unknown Card',
+                  'This card is not registered to any student',
+                  backgroundColor: Colors.orange,
+                  colorText: Colors.white,
+                  snackPosition: SnackPosition.BOTTOM,
+                  duration: const Duration(seconds: 2),
+                );
+                
+                // Restart the NFC session after a short delay
+                await Future.delayed(const Duration(milliseconds: 1500));
+                if (continuousScanning && mounted) {
+                  startNfcSession();
+                }
               }
             }
           } catch (e) {
             debugPrint('Error processing NFC tag: $e');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error processing card: $e')),
+            
+            // Use GetX for showing error messages
+            Get.snackbar(
+              'Error',
+              'Error processing card: $e',
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+              snackPosition: SnackPosition.BOTTOM,
             );
+            
+            // Restart the NFC session after error
+            await Future.delayed(const Duration(milliseconds: 1500));
+            if (continuousScanning && mounted) {
+              startNfcSession();
+            }
           }
+        },
+        // Configure NFC read mode for optimal performance
+        pollingOptions: {
+          NfcPollingOption.iso14443,
+          NfcPollingOption.iso15693,
         },
       );
     } catch (e) {
@@ -136,256 +312,175 @@ class _AttendancePageState extends State<AttendancePage> {
       setState(() {
         isReading = false;
       });
+      
+      Get.snackbar(
+        'NFC Error',
+        'Failed to start NFC scanning: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      
+      // Try to restart the session after an error
+      await Future.delayed(const Duration(seconds: 3));
+      if (continuousScanning && mounted) {
+        startNfcSession();
+      }
     }
   }
 
+  // Function to get student ID from card ID
   Future<String?> getStudentIdFromCard(String classroom, String cardId) async {
     try {
-      // Get the app's document directory
+      // First try to get it from the controller
+      final studentData = await _classroomStudentController.getStudentByCardId(classroom, cardId);
+      if (studentData != null) {
+        return studentData.id;
+      }
+      
+      // If not found in controller, try fallback methods
       final directory = await getApplicationDocumentsDirectory();
-      final filePath = '${directory.path}/$classroom.json';
-
-      // Read the file
-      File file = File(filePath);
+      final file = File('${directory.path}/students.json');
+      
       if (await file.exists()) {
-        String fileContent = await file.readAsString();
-
-        // Decode the JSON data
-        Map<String, dynamic> data = jsonDecode(fileContent);
-
-        // Search for the student with the specified card ID
-        if (data.containsKey('data')) {
-          List students = data['data'];
-          for (var student in students) {
-            if (student['cardId'] == cardId) {
-              return student['id'];
-            }
+        final jsonString = await file.readAsString();
+        final List<dynamic> students = jsonDecode(jsonString);
+        
+        for (var student in students) {
+          if (student['cardId'] == cardId && student['classroom'] == classroom) {
+            return student['id'];
           }
         }
-      } else {
-        print('File does not exist: $filePath');
       }
+      
+      return null;
     } catch (e) {
-      print('Error reading data from file: $e');
+      debugPrint('Error getting student ID: $e');
+      return null;
     }
-
-    return null; // Return null if the student ID is not found
-  }
-
-  Future<bool> _onWillPop() async {
-    return false;
   }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onWillPop,
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: primaryColor,
-          elevation: 0,
-          toolbarHeight: 100, // Set the height of the AppBar
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back,
-                color: Colors.white), // Back button icon
-            onPressed: () {
-              context.safeGoNamed(home); // Navigate back
-            },
-          ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                widget.classroom.toString(),
-                style:
-                    const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.classroom ?? 'Attendance'),
+        centerTitle: true,
+        actions: [
+          // Add a counter for check-ins
+          Obx(() => Center(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: Text(
+                'Check-ins: ${_attendanceController.checkInCount.value}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-            ],
-          ),
-          actions: [
-            StreamBuilder<ConnectivityResult>(
-              stream: Connectivity().onConnectivityChanged,
-              builder: (context, snapshot) {
-                bool isOnline = snapshot.data != ConnectivityResult.none;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isOnline ? Icons.wifi : Icons.wifi_off,
-                        color: isOnline ? Colors.white : Colors.orange,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isOnline ? 'Online' : 'Offline',
-                        style: TextStyle(
-                          fontSize: 24,
-                          color: isOnline ? Colors.white : Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
             ),
+          ))
+        ],
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Scan Student Card',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            if (isNfcAvailable)
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  // NFC Icon with animation
+                  AnimatedBuilder(
+                    animation: _animationController,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _pulseAnimation.value,
+                        child: Container(
+                          width: 200,
+                          height: 200,
+                          decoration: BoxDecoration(
+                            color: isReading ? Colors.green.withOpacity(0.7) : Colors.grey.withOpacity(0.5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.nfc,
+                              size: 100,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  // Latest student checked in
+                  Positioned(
+                    bottom: 0,
+                    child: Obx(() {
+                      final lastStudent = _attendanceController.lastCheckedInStudent.value;
+                      if (lastStudent.isEmpty) return const SizedBox.shrink();
+                      
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Last: $lastStudent',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              )
+            else
+              const Column(
+                children: [
+                  Icon(
+                    Icons.nfc,
+                    size: 100,
+                    color: Colors.red,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'NFC is not available on this device',
+                    style: TextStyle(color: Colors.red, fontSize: 16),
+                  ),
+                ],
+              ),
+            
+            const SizedBox(height: 30),
+            
+            // Status indicator
+            Obx(() => Container(
+              height: 60,
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 40),
+              decoration: BoxDecoration(
+                color: _attendanceController.isLoading.value 
+                  ? Colors.orange 
+                  : (_attendanceController.successMessage.value.isNotEmpty 
+                    ? Colors.green 
+                    : Colors.blue),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(
+                child: Text(
+                  _attendanceController.isLoading.value 
+                    ? 'Processing...' 
+                    : (_attendanceController.successMessage.value.isNotEmpty 
+                      ? 'Ready for next scan' 
+                      : 'Waiting for card'),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            )),
           ],
-        ),
-        body: BlocConsumer<AttendanceBloc, AttendanceState>(
-          listener: (context, state) {
-            if (state is AttendanceSuccess) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        state.isOffline
-                            ? 'Attendance checkout successful'
-                            : 'Welcome ${state.checkInModel.data?.studentName ?? ""}!',
-                      ),
-                      if (!state.isOffline && state.checkInModel.data != null)
-                        Text(
-                          'Check-in time: ${state.checkInModel.data!.checkInTime}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                    ],
-                  ),
-                  backgroundColor:
-                      state.isOffline ? Colors.green : Colors.green,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            } else if (state is AttendanceError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          },
-          builder: (context, state) {
-            return Column(
-              children: [
-                Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (!isNfcAvailable)
-                            const Column(
-                              children: [
-                                Icon(
-                                  Icons.nfc,
-                                  size: 64,
-                                  color: Colors.red,
-                                ),
-                                SizedBox(height: 16),
-                                Text(
-                                  'NFC is not available on this device',
-                                  style: TextStyle(
-                                      color: Colors.red, fontSize: 18),
-                                ),
-                              ],
-                            )
-                          else ...[
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 500),
-                              width: 150,
-                              height: 150,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.blue.withOpacity(0.1),
-                                border: Border.all(
-                                  color: Colors.blue,
-                                  width: 2,
-                                ),
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  Icons.nfc,
-                                  size: 64,
-                                  color: state is AttendanceLoading
-                                      ? Colors.grey
-                                      : Colors.blue,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              state is AttendanceLoading
-                                  ? 'Processing...'
-                                  : 'Tap your card to make \nattendance',
-                              style: GoogleFonts.poppins(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                // Recent activity section
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Recent Activity',
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 100,
-                        child: BlocBuilder<AttendanceBloc, AttendanceState>(
-                          builder: (context, state) {
-                            if (state is AttendanceSuccess) {
-                              return ListTile(
-                                leading: const CircleAvatar(
-                                  child: Icon(Icons.person),
-                                ),
-                                title: Text(
-                                  state.checkInModel.data?.studentName ??
-                                      'Unknown',
-                                ),
-                                subtitle: Text(
-                                  'Status: ${state.checkInModel.data?.status ?? "Unknown"}',
-                                ),
-                                trailing: Text(
-                                  state.checkInModel.data?.checkInTime ?? '',
-                                  style: const TextStyle(color: Colors.grey),
-                                ),
-                              );
-                            }
-                            return const Center(
-                              child: Text('No recent activity'),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
         ),
       ),
     );
@@ -394,6 +489,7 @@ class _AttendancePageState extends State<AttendancePage> {
   @override
   void dispose() {
     NfcManager.instance.stopSession();
+    _animationController.dispose();
     super.dispose();
   }
 }

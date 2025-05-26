@@ -1,41 +1,38 @@
 import 'dart:io';
 
-import 'package:attendance/api/attendance.service.dart';
-import 'package:attendance/api/auth.service.dart';
+// Controllers
+import 'package:attendance/controllers/assign_student_card_controller.dart';
+import 'package:attendance/controllers/attendance_controller.dart';
+import 'package:attendance/controllers/classroom_student_controller.dart';
+import 'package:attendance/controllers/school_classroom_controller.dart';
+import 'package:attendance/controllers/user_login_controller.dart';
 import 'package:attendance/routes/routes.provider.dart';
-import 'package:attendance/states/assign.student.card/assign_student_card_bloc.dart';
-import 'package:attendance/states/attendance/attendance_state.dart';
-import 'package:attendance/states/classroom.student/classroom_student_bloc.dart';
-import 'package:attendance/states/make.attendance/make_attendance_bloc.dart';
-import 'package:attendance/states/attendance/attendance_bloc.dart';
-import 'package:attendance/states/school.classroom/school_classroom_bloc.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'states/user.login/user_login_bloc.dart';
-
 Future<void> main() async {
-  if (kReleaseMode) {
+  // Load environment variables based on build mode
+  if (kReleaseMode || kDebugMode || kProfileMode) {
     await dotenv.load(fileName: '.env');
   }
-  if (kDebugMode) {
-    await dotenv.load(fileName: '.env');
-  }
-  if (kProfileMode) {
-    await dotenv.load(fileName: '.env');
-  }
+  
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   final prefs = await SharedPreferences.getInstance();
   final showHome = prefs.getBool('showHome') ?? false;
 
+  // Override HTTP for handling certificates
   HttpOverrides.global = MyHttpOverrides();
+  
+  // Initialize GetX controllers
+  _initializeGetXControllers();
+  
   runApp(MyApp(showHome: showHome));
 }
 
@@ -54,38 +51,27 @@ class _MyAppState extends State<MyApp> {
         statusBarColor: primaryColor,
         statusBarIconBrightness: Brightness.light, // For Android (dark icons)
         statusBarBrightness: Brightness.light));
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider<UserLoginBloc>(
-            create: (_) => UserLoginBloc(UserLoginInitial(), AuthService())),
-        BlocProvider<SchoolClassroomBloc>(
-            create: (_) =>
-                SchoolClassroomBloc(SchoolClassroomInitial(), AuthService())),
-        BlocProvider<ClassroomStudentBloc>(
-            create: (_) =>
-                ClassroomStudentBloc(ClassroomStudentInitial(), AuthService())),
-        BlocProvider<AssignStudentCardBloc>(
-            create: (_) => AssignStudentCardBloc(
-                AssignStudentCardInitial(), AuthService())),
-        BlocProvider<AttendanceBloc>(
-            create: (_) => AttendanceBloc(AttendanceService())),
-        BlocProvider<CreateAttendanceBloc>(
-          create: (context) => CreateAttendanceBloc(
-            CreateAttendanceInitial(),
-            AuthService(),
-          ),
-        ),
-      ],
-      child: MaterialApp.router(
-        routerConfig: AppNavigation.router,
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-          primaryColor: Color.fromARGB(255, 18, 170, 112),
-        ),
+    
+    // Using GetMaterialApp with go_router
+    return MaterialApp.router(
+      routerConfig: AppNavigation.router,
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+        primaryColor: const Color.fromARGB(255, 18, 170, 112),
       ),
     );
   }
+}
+
+// Initialize all GetX controllers
+void _initializeGetXControllers() {
+  // Put all controllers using Get.put with permanent: true to keep them alive throughout the app
+  Get.put(UserLoginController(), permanent: true);
+  Get.put(SchoolClassroomController(), permanent: true);
+  Get.put(ClassroomStudentController(), permanent: true);
+  Get.put(AssignStudentCardController(), permanent: true);
+  Get.put(AttendanceController(), permanent: true);
 }
 
 class MyHttpOverrides extends HttpOverrides {

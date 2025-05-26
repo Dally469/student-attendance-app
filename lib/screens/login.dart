@@ -1,14 +1,13 @@
-import 'package:attendance/api/auth.service.dart';
+import 'package:attendance/controllers/user_login_controller.dart';
 import 'package:attendance/routes/routes.names.dart';
 import 'package:attendance/routes/routes.provider.dart';
 import 'package:attendance/screens/widgets/buttons/button.dart';
 import 'package:attendance/screens/widgets/forms/email_text_input.dart';
 import 'package:attendance/screens/widgets/heading.dart';
-import 'package:attendance/states/user.login/user_login_bloc.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:attendance/utils/notifiers.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class LoginPage extends StatefulWidget {
@@ -19,22 +18,18 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-
-  UserLoginBloc loginBloc = UserLoginBloc(UserLoginInitial(), AuthService());
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-  String sentOtp = "";
-  String? token;
-  bool isRegisterLoading = false;
-  bool isPhone = false;
   bool _passwordVisible = false;
+  
+  // Get the controller using GetX
+  final UserLoginController _loginController = Get.find<UserLoginController>();
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  
   @override
   void initState() {
     super.initState();
-
-    loginBloc = BlocProvider.of<UserLoginBloc>(context);
   }
 
   @override
@@ -176,52 +171,53 @@ class _LoginPageState extends State<LoginPage> {
               ),
               Padding(
                 padding: const EdgeInsets.all(10.0),
-                child: BlocConsumer<UserLoginBloc, UserLoginState>(
-                  listener: (context, state) {
-                    if (state is UserLoginError) {
-                      showErrorAlert(state.message, context);
-                      setState(() {
-                        isRegisterLoading = false;
-                      });
-                    }
-                    if (state is UserLoginLoading) {
-                      setState(() {
-                        isRegisterLoading = true;
-                      });
-                    }
-                    if (state is UserLoginSuccess) {
-                      setState(() {
-                        isRegisterLoading = false;
-                      });
-
-                      String obtainedClientId =
-                          state.userLoginModel.data!.id.toString();
-
-                      context.safeGoNamed(home, params: {
-                        'userId': obtainedClientId,
-                      });
-                    }
-                  },
-                  builder: (context, state) {
+                child: Obx(() {
+                  // Handle different states based on controller properties
+                  if (_loginController.isLoading.value) {
+                    return MyButton(
+                      backgroundColor: primaryColor,
+                      titleColor: whiteColor,
+                      title: 'Signing in...',
+                      isLoading: true,
+                      onTap: () {},
+                    );
+                  } else {
                     return MyButton(
                       backgroundColor: primaryColor,
                       titleColor: whiteColor,
                       title: 'Login',
                       onTap: () {
-                        if (_emailController.text.isEmpty &&
-                            _passwordController.text.isEmpty) {
-                          showErrorAlert(
-                              "Please fill username and password", context);
+                        if (_emailController.text.isEmpty && _passwordController.text.isEmpty) {
+                          showErrorAlert("Please fill username and password", context);
                         } else {
-                          loginBloc.add(HandleUSerLogin(
-                              username: _emailController.text.toString(),
-                              password: _passwordController.text.toString()));
+                          // Use GetX controller to handle login
+                          _loginController.login(
+                            _emailController.text.trim(),
+                            _passwordController.text,
+                          );
+                          
+                          // Setup listener for login success
+                          ever(_loginController.user, (user) {
+                            if (user != null && user.data != null) {
+                              String obtainedClientId = user.data!.id.toString();
+                              context.safeGoNamed(home, params: {
+                                'userId': obtainedClientId,
+                              });
+                            }
+                          });
+                          
+                          // Setup listener for login error
+                          ever(_loginController.errorMessage, (message) {
+                            if (message.isNotEmpty) {
+                              showErrorAlert(message, context);
+                            }
+                          });
                         }
                       },
-                      isLoading: isRegisterLoading,
+                      isLoading: false,
                     );
-                  },
-                ),
+                  }
+                }),
               ),
             ],
           ),
