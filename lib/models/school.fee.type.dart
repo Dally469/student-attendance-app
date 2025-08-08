@@ -1,19 +1,19 @@
-class SchoolClassroomModel {
+class SchoolFeeTypeModel {
   int? status;
   bool? success;
   String? message;
-  List<Classroom>? data;
+  List<FeesData>? data;
 
-  SchoolClassroomModel({this.status, this.success, this.message, this.data});
+  SchoolFeeTypeModel({this.status, this.success, this.message, this.data});
 
-  SchoolClassroomModel.fromJson(Map<String, dynamic> json) {
+  SchoolFeeTypeModel.fromJson(Map<String, dynamic> json) {
     status = json['status'];
     success = json['success'];
     message = json['message'];
     if (json['data'] != null) {
-      data = <Classroom>[];
+      data = <FeesData>[];
       json['data'].forEach((v) {
-        data!.add(Classroom.fromJson(v));
+        data!.add(FeesData.fromJson(v));
       });
     }
   }
@@ -30,27 +30,55 @@ class SchoolClassroomModel {
   }
 }
 
-class Classroom {
+class FeesData {
   String? id;
-  School? school;
   String? name;
+  double? amount; // Changed from int? to double?
+  School? school;
+  String? description;
+  bool? active;
+  String? academicYear;
+  String? term;
 
-  Classroom({this.id, this.school, this.name});
+  FeesData({
+    this.id,
+    this.name,
+    this.amount,
+    this.school,
+    this.description,
+    this.active,
+    this.academicYear,
+    this.term,
+  });
 
-  Classroom.fromJson(Map<String, dynamic> json) {
+  FeesData.fromJson(Map<String, dynamic> json) {
     id = json['id'];
-    school =
-        json['school'] != null ? School.fromJson(json['school']) : null;
     name = json['name'];
+    // Handle both int and double values for amount
+    amount = (json['amount'] is int)
+        ? (json['amount'] as int).toDouble()
+        : json['amount'] is double
+            ? json['amount']
+            : null;
+    school = json['school'] != null ? School.fromJson(json['school']) : null;
+    description = json['description'];
+    active = json['active'];
+    academicYear = json['academicYear'];
+    term = json['term'];
   }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['id'] = id;
+    data['name'] = name;
+    data['amount'] = amount;
     if (school != null) {
       data['school'] = school!.toJson();
     }
-    data['name'] = name;
+    data['description'] = description;
+    data['active'] = active;
+    data['academicYear'] = academicYear;
+    data['term'] = term;
     return data;
   }
 }
@@ -64,14 +92,15 @@ class School {
   String? status;
   String? slogan;
 
-  School(
-      {this.id,
-      this.name,
-      this.phone,
-      this.email,
-      this.logo,
-      this.status,
-      this.slogan});
+  School({
+    this.id,
+    this.name,
+    this.phone,
+    this.email,
+    this.logo,
+    this.status,
+    this.slogan,
+  });
 
   School.fromJson(Map<String, dynamic> json) {
     id = json['id'];

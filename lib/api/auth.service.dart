@@ -6,7 +6,6 @@ import 'dart:io';
 import 'package:attendance/models/single.student.model.dart';
 import 'package:attendance/models/student.model.dart';
 import 'package:attendance/models/user.login.model.dart';
-import 'package:flutter/foundation.dart';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
@@ -64,9 +63,7 @@ Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
 
     
       final Map<String, dynamic> results = jsonDecode(response.body);
-      print("=================== RESULT ===============");
-      print(results.entries);
-
+  
       // Always parse the response into the model regardless of status code
       // The success/failure is handled by checking the 'success' field in the model
       return SchoolClassroomModel.fromJson(results);
@@ -203,4 +200,6 @@ Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
     
     return attendanceModel;
   }
+
+
 }

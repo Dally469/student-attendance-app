@@ -170,13 +170,14 @@ class _AssignCardPageState extends State<AssignCardPage> {
                           if (_cardController.isSuccess.value) {
                             // Handle navigation after success
                             Future.delayed(const Duration(seconds: 2), () {
-                              context.safeGoNamed(assignCard, params: {
+                            Get.toNamed(assignCard, parameters: {
                                 'classroom': widget.classroom.toString(),
                                 'classroomId': widget.studentId.toString(),
                               });
                             });
                             
                             return const Column(
+
                               children: [
                                 Icon(Icons.check_circle,
                                     size: 100, color: Colors.green),

@@ -53,7 +53,7 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () {
-              context.safeGoNamed(home);
+            Get.toNamed(home);
             },
           ),
           title: Column(
@@ -333,8 +333,8 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
                                               )
                                             : TextButton(
                                                 onPressed: () {
-                                                  context.safeGoNamed(addCard,
-                                                      params: {
+                                                  Get.toNamed(addCard,
+                                                      parameters: {
                                                         'studentName': student
                                                             .name
                                                             .toString(),
@@ -378,7 +378,7 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
                                   ],
                                 ),
                                 onTap: () {
-                                  context.safeGoNamed(addCard, params: {
+                                  Get.toNamed(addCard, parameters: {
                                     'studentName': student.name.toString(),
                                     'studentId': student.id.toString(),
                                     'studentCode': student.code.toString(),

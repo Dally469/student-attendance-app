@@ -8,6 +8,8 @@ import 'package:attendance/routes/routes.provider.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -88,9 +90,9 @@ class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
   void navigationPage() {
     // Check conditions in sequence
     if (jsonCheck == 'no') {
-      context.safeGoNamed(login);
+      Get.toNamed(login);
     }else {
-      context.safeGoNamed(home);
+      Get.toNamed(home);
     }
   }
 

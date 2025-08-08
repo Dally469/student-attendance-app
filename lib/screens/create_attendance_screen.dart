@@ -1,4 +1,5 @@
 // lib/screens/create_attendance_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -56,28 +57,47 @@ class CreateAttendanceScreen extends StatelessWidget {
                       backgroundColor: primaryColor,
                       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
                       if (classroomId != null) {
-                        attendanceController.createAttendance(classroomId!);
+                        // First, remove any existing listener to avoid duplicates
+                        attendanceController.successMessage.listen((message) {}).cancel();
                         
-                        // Setup listener for completion
-                        ever(attendanceController.currentAttendance, (attendance) {
-                          if (attendance != null) {
-                            Get.snackbar(
-                              'Success', 
-                              'Attendance created successfully',
-                              backgroundColor: Colors.green.withOpacity(0.7),
-                              colorText: Colors.white,
-                            );
-                            Get.back();
+                        // Declare the subscription variable first
+                        late final StreamSubscription<String> subscription;
+                        
+                        // Setup proper listeners BEFORE initiating the action
+                        // Listen to success message instead of the object itself
+                        subscription = attendanceController.successMessage.listen((message) {
+                          if (message.isNotEmpty) {
+                            // Add delay before UI updates as per best practices
+                            Future.delayed(const Duration(milliseconds: 300), () {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(message),
+                                    backgroundColor: Colors.green,
+                                  )
+                                );
+                                
+                                // Navigate back safely using context
+                                Navigator.of(context).pop();
+                              }
+                            });
+                            
+                            // Clean up the subscription
+                            subscription.cancel();
                           }
                         });
+                        
+                        // Now execute the action
+                        await attendanceController.createAttendance(classroomId!);
                       } else {
-                        Get.snackbar(
-                          'Error', 
-                          'No classroom selected',
-                          backgroundColor: Colors.red.withOpacity(0.7),
-                          colorText: Colors.white,
+                        // Show error directly since we're not in a reactive context
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('No classroom selected'),
+                            backgroundColor: Colors.red,
+                          )
                         );
                       }
                     },

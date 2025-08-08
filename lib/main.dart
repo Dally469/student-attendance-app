@@ -6,7 +6,7 @@ import 'package:attendance/controllers/attendance_controller.dart';
 import 'package:attendance/controllers/classroom_student_controller.dart';
 import 'package:attendance/controllers/school_classroom_controller.dart';
 import 'package:attendance/controllers/user_login_controller.dart';
-import 'package:attendance/routes/routes.provider.dart';
+import 'package:attendance/screens/splash.screen.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -15,12 +15,17 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'controllers/parent_communication_controller.dart';
+import 'controllers/school_fees_controller.dart';
+import 'routes/routes.names.dart'; // Route names
+import 'routes/routes.provider.dart'; // Updated routes provider for GetX
+
 Future<void> main() async {
   // Load environment variables based on build mode
   if (kReleaseMode || kDebugMode || kProfileMode) {
     await dotenv.load(fileName: '.env');
   }
-  
+
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
@@ -29,37 +34,40 @@ Future<void> main() async {
 
   // Override HTTP for handling certificates
   HttpOverrides.global = MyHttpOverrides();
-  
+
+  // Initialize GetX
+  Get.config(enableLog: true, defaultTransition: Transition.fade);
+
+  // Enable test mode to suppress contextless navigation warnings
+  Get.testMode = true;
+
   // Initialize GetX controllers
   _initializeGetXControllers();
-  
+
   runApp(MyApp(showHome: showHome));
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   final bool showHome;
   const MyApp({Key? key, required this.showHome}) : super(key: key);
 
   @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  @override
   Widget build(BuildContext context) {
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-        statusBarColor: primaryColor,
-        statusBarIconBrightness: Brightness.light, // For Android (dark icons)
-        statusBarBrightness: Brightness.light));
-    
-    // Using GetMaterialApp with go_router
-    return MaterialApp.router(
-      routerConfig: AppNavigation.router,
+      statusBarColor: primaryColor,
+      statusBarIconBrightness: Brightness.light, // For Android (dark icons)
+      statusBarBrightness: Brightness.light,
+    ));
+
+    return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         visualDensity: VisualDensity.adaptivePlatformDensity,
         primaryColor: const Color.fromARGB(255, 18, 170, 112),
       ),
+      initialRoute: showHome ? home : splash,
+      getPages: AppNavigation.getPages, // Use GetX routes
+      home: Splash(),
     );
   }
 }
@@ -72,6 +80,8 @@ void _initializeGetXControllers() {
   Get.put(ClassroomStudentController(), permanent: true);
   Get.put(AssignStudentCardController(), permanent: true);
   Get.put(AttendanceController(), permanent: true);
+  Get.put(ParentCommunicationController(), permanent: true);
+  Get.put(SchoolFeesController(), permanent: true);
 }
 
 class MyHttpOverrides extends HttpOverrides {

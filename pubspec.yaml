@@ -47,6 +47,9 @@ dependencies:
   provider: ^6.0.2
   nfc_manager: ^3.3.0
   connectivity_plus: any
+  device_info_plus: ^4.0.0
+  path_provider: ^2.0.15
+  intl: ^0.18.1
 
 
 dev_dependencies:

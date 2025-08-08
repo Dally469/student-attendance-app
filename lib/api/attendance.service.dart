@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -8,6 +10,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/check.in.model.dart' as legacy;
 import '../models/check_in.dart';
 import '../models/offline_check_in.dart';
+import '../models/attendance_sync_request.dart';
 
 class AttendanceService {
   Future<void> saveOfflineCheckIn(OfflineCheckIn checkIn) async {
@@ -150,42 +153,134 @@ class AttendanceService {
         return false;
       }
 
+      // Group offline check-ins by classroom ID
+      Map<String, List<OfflineCheckIn>> checkInsByClassroom = {};
       List<OfflineCheckIn> unsyncedCheckIns = await getUnsyncedCheckIns();
+      
       if (unsyncedCheckIns.isEmpty) return true;
-
-      SharedPreferences sharedPreferences =
-          await SharedPreferences.getInstance();
-      String? token = sharedPreferences.getString("token");
-
+      
+      // Group check-ins by classroom for batch processing
       for (var checkIn in unsyncedCheckIns) {
-        try {
-          var response = await markAttendance(
-            studentId: checkIn.studentId,
-            classroomId: checkIn.classroomId,
-            attendanceId: checkIn.attendanceId,
-          );
-
-          if (response.success) {
-            // Remove the synced check-in from storage
-            String key = 'offline_checkins_${checkIn.classroomId}';
-            List<String> existingCheckins =
-                sharedPreferences.getStringList(key) ?? [];
-            existingCheckins.removeWhere((record) {
-              var recordJson = json.decode(record);
-              return recordJson['studentId'] == checkIn.studentId &&
-                  recordJson['timestamp'] ==
-                      checkIn.timestamp.toIso8601String();
-            });
-            await sharedPreferences.setStringList(key, existingCheckins);
-          }
-        } catch (e) {
-          print('Error syncing check-in: $e');
+        if (!checkInsByClassroom.containsKey(checkIn.classroomId)) {
+          checkInsByClassroom[checkIn.classroomId] = [];
+        }
+        checkInsByClassroom[checkIn.classroomId]!.add(checkIn);
+      }
+      
+      // Sync attendance records by classroom
+      for (var classroomId in checkInsByClassroom.keys) {
+        final success = await _syncAttendanceRecordsByClassroom(
+          classroomId,
+          checkInsByClassroom[classroomId]!,
+        );
+        
+        if (!success) {
+          print('Failed to sync records for classroom: $classroomId');
         }
       }
-
+      
       return true;
     } catch (e) {
       print('Error syncing offline check-ins: $e');
+      return false;
+    }
+  }
+  
+  // Get device ID for sync request
+  Future<String> _getDeviceId() async {
+    final deviceInfo = DeviceInfoPlugin();
+    String deviceId = 'unknown-device';
+    
+    try {
+      if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        deviceId = androidInfo.device!;
+      } else if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        deviceId = iosInfo.identifierForVendor ?? 'ios-device';
+      } else if (Platform.isMacOS) {
+        final macOsInfo = await deviceInfo.macOsInfo;
+        deviceId = macOsInfo.systemGUID ?? 'macos-device';
+      }
+    } catch (e) {
+      print('Error getting device info: $e');
+      deviceId = 'device-id-error';
+    }
+    
+    return deviceId;
+  }
+  
+  // Sync attendance records for a specific classroom
+  Future<bool> _syncAttendanceRecordsByClassroom(
+      String classroomId, List<OfflineCheckIn> checkIns) async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString("token");
+      
+      if (token == null) {
+        print('Authentication token not found');
+        return false;
+      }
+      
+      // Get device ID for the request
+      String deviceId = await _getDeviceId();
+      
+      // Format the date as required in the request (YYYY-MM-DD)
+      final now = DateTime.now();
+      final attendanceDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      
+      // Convert offline check-ins to attendance records
+      List<AttendanceRecord> attendanceRecords = checkIns.map((checkIn) {
+        // Default status is PRESENT, but this could be enhanced to use actual status
+        return AttendanceRecord(
+          studentId: checkIn.studentId,
+          status: 'PRESENT',
+          recordedAt: checkIn.timestamp.toIso8601String(),
+        );
+      }).toList();
+      
+      // Create the sync request
+      final syncRequest = AttendanceSyncRequest(
+        classroomId: classroomId,
+        attendanceDate: attendanceDate,
+        syncTimestamp: DateTime.now().toIso8601String(),
+        deviceId: deviceId,
+        attendanceRecords: attendanceRecords,
+      );
+      
+      // Make the API request
+      Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': token,
+      };
+      
+      var response = await http.post(
+        Uri.parse('${dotenv.get('mainUrl')}/api/attendance/sync'),
+        headers: headers,
+        body: json.encode(syncRequest.toJson()),
+      );
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Clear the successfully synced records from storage
+        String key = 'offline_checkins_$classroomId';
+        List<String> existingCheckins = prefs.getStringList(key) ?? [];
+        
+        // Remove all the synced check-ins for this classroom
+        existingCheckins.removeWhere((record) {
+          var recordJson = json.decode(record);
+          return checkIns.any((checkIn) =>
+              recordJson['studentId'] == checkIn.studentId &&
+              recordJson['timestamp'] == checkIn.timestamp.toIso8601String());
+        });
+        
+        await prefs.setStringList(key, existingCheckins);
+        return true;
+      } else {
+        print('API error: ${response.statusCode} - ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('Error syncing attendance records for classroom $classroomId: $e');
       return false;
     }
   }

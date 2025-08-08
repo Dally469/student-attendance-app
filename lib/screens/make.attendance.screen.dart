@@ -362,127 +362,414 @@ class _AttendancePageState extends State<AttendancePage> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(widget.classroom ?? 'Attendance'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
         centerTitle: true,
-        actions: [
-          // Add a counter for check-ins
-          Obx(() => Center(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: Text(
-                'Check-ins: ${_attendanceController.checkInCount.value}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.school_outlined, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              widget.classroom ?? 'Attendance',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+                fontSize: 20,
+                color: Colors.black87,
               ),
             ),
-          ))
+          ],
+        ),
+        actions: [
+          // Check-in counter with animated container
+          Obx(() => AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            margin: const EdgeInsets.only(right: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${_attendanceController.checkInCount.value}',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          )),
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Scan Student Card',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            if (isNfcAvailable)
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  // NFC Icon with animation
-                  AnimatedBuilder(
-                    animation: _animationController,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _pulseAnimation.value,
-                        child: Container(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.colorScheme.primaryContainer.withOpacity(0.2),
+              Colors.white,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              // Stats dashboard
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Card(
+                  elevation: 0,
+                  color: Colors.white,
+                  surfaceTintColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildStatColumn(
+                          icon: Icons.people_alt_outlined,
+                          value: _classroomStudentController.students.length.toString(),
+                          label: 'Total',
+                          color: theme.colorScheme.primary,
+                        ),
+                        _buildDivider(),
+                        Obx(() => _buildStatColumn(
+                          icon: Icons.check_circle_outline,
+                          value: _attendanceController.checkInCount.value.toString(),
+                          label: 'Present',
+                          color: Colors.green,
+                        )),
+                        _buildDivider(),
+                        Obx(() => _buildStatColumn(
+                          icon: Icons.cancel_outlined,
+                          value: ((_classroomStudentController.students.length) - _attendanceController.checkInCount.value).toString(),
+                          label: 'Absent',
+                          color: Colors.redAccent,
+                        )),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Scan Student Card',
+                        style: GoogleFonts.poppins(
+                          fontSize: 24, 
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Hold NFC card close to the back of your device',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: Colors.black54,
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                      
+                      // NFC Scanning visualization
+                      if (isNfcAvailable)
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Background rings
+                            ...[0.6, 0.8, 1.0].map((opacity) => AnimatedBuilder(
+                              animation: _animationController,
+                              builder: (context, child) {
+                                final scale = _pulseAnimation.value * (1.0 + (1.0 - opacity) * 0.3);
+                                return Opacity(
+                                  opacity: opacity,
+                                  child: Transform.scale(
+                                    scale: scale,
+                                    child: Container(
+                                      width: 200,
+                                      height: 200,
+                                      decoration: BoxDecoration(
+                                        color: Colors.transparent,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isReading 
+                                            ? theme.colorScheme.primary
+                                            : Colors.grey.withOpacity(0.5),
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            )),
+                            
+                            // Central NFC Icon
+                            Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                color: isReading
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.primaryContainer,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: isReading
+                                      ? theme.colorScheme.primary.withOpacity(0.3)
+                                      : Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  Icons.contactless_rounded,
+                                  size: 70,
+                                  color: isReading ? Colors.white : theme.colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Container(
                           width: 200,
                           height: 200,
                           decoration: BoxDecoration(
-                            color: isReading ? Colors.green.withOpacity(0.7) : Colors.grey.withOpacity(0.5),
+                            color: Colors.grey.shade100,
                             shape: BoxShape.circle,
                           ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.nfc,
-                              size: 100,
-                              color: Colors.white,
-                            ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.not_interested,
+                                size: 70,
+                                color: Colors.red.shade300,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'NFC Unavailable',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.red.shade300,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    },
+                    ],
                   ),
-                  // Latest student checked in
-                  Positioned(
-                    bottom: 0,
-                    child: Obx(() {
-                      final lastStudent = _attendanceController.lastCheckedInStudent.value;
-                      if (lastStudent.isEmpty) return const SizedBox.shrink();
-                      
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black87,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          'Last: $lastStudent',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              )
-            else
-              const Column(
-                children: [
-                  Icon(
-                    Icons.nfc,
-                    size: 100,
-                    color: Colors.red,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'NFC is not available on this device',
-                    style: TextStyle(color: Colors.red, fontSize: 16),
-                  ),
-                ],
-              ),
-            
-            const SizedBox(height: 30),
-            
-            // Status indicator
-            Obx(() => Container(
-              height: 60,
-              width: double.infinity,
-              margin: const EdgeInsets.symmetric(horizontal: 40),
-              decoration: BoxDecoration(
-                color: _attendanceController.isLoading.value 
-                  ? Colors.orange 
-                  : (_attendanceController.successMessage.value.isNotEmpty 
-                    ? Colors.green 
-                    : Colors.blue),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(
-                  _attendanceController.isLoading.value 
-                    ? 'Processing...' 
-                    : (_attendanceController.successMessage.value.isNotEmpty 
-                      ? 'Ready for next scan' 
-                      : 'Waiting for card'),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               ),
-            )),
-          ],
+              
+              // Last scanned student card
+              Obx(() {
+                final lastStudent = _attendanceController.lastCheckedInStudent.value;
+                if (lastStudent.isEmpty) {
+                  return const SizedBox(height: 100);
+                }
+                
+                return Container(
+                  margin: const EdgeInsets.all(16),
+                  height: 100,
+                  width: double.infinity,
+                  child: Card(
+                    elevation: 0,
+                    color: theme.colorScheme.primaryContainer.withOpacity(0.7),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          // Avatar or initials
+                          CircleAvatar(
+                            radius: 30,
+                            backgroundColor: theme.colorScheme.primary,
+                            child: Text(
+                              lastStudent.isNotEmpty 
+                                ? lastStudent.substring(0, 1).toUpperCase()
+                                : "?",
+                              style: GoogleFonts.poppins(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  "Last Check-in",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Colors.black45,
+                                  ),
+                                ),
+                                Text(
+                                  lastStudent,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              'Present',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              
+              // Status indicator
+              Obx(() => Container(
+                height: 60,
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: _attendanceController.isLoading.value 
+                      ? [Colors.orange.shade300, Colors.orange.shade500]
+                      : (_attendanceController.successMessage.value.isNotEmpty 
+                        ? [Colors.green.shade300, Colors.green.shade500] 
+                        : [theme.colorScheme.primary.withOpacity(0.7), theme.colorScheme.primary]),
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _attendanceController.isLoading.value 
+                        ? Icons.hourglass_top_rounded
+                        : (_attendanceController.successMessage.value.isNotEmpty 
+                          ? Icons.check_circle_outline
+                          : Icons.contactless_rounded),
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _attendanceController.isLoading.value 
+                        ? 'Processing...' 
+                        : (_attendanceController.successMessage.value.isNotEmpty 
+                          ? 'Ready for next scan' 
+                          : 'Waiting for card'),
+                      style: GoogleFonts.poppins(
+                        color: Colors.white, 
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+            ],
+          ),
         ),
       ),
+    );
+  }
+  
+  // Helper method to build stat columns
+  Widget _buildStatColumn({required IconData icon, required String value, required String label, required Color color}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: Colors.black87,
+          ),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: Colors.black54,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  // Helper method to build vertical dividers
+  Widget _buildDivider() {
+    return Container(
+      height: 40,
+      width: 1,
+      color: Colors.grey.withOpacity(0.3),
     );
   }
 
