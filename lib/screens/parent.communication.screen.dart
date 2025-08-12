@@ -30,6 +30,8 @@ class _ParentCommunicationState extends State<ParentCommunication>
   late AnimationController _animationController;
   late Animation<double> _fabAnimation;
 
+
+
   @override
   void initState() {
     super.initState();
@@ -38,8 +40,7 @@ class _ParentCommunicationState extends State<ParentCommunication>
           "${widget.classroomId ?? 'Unknown ID'} - ${widget.classroom ?? 'Unknown Classroom'}");
     }
     _studentController.getStudentsByClassroomId(widget.classroom ?? "");
-    _communicationController.fetchRecipients(widget.classroomId ?? "");
-
+ 
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -417,9 +418,10 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
   final TextEditingController _messageController = TextEditingController();
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  bool _isPreviewVisible = false; // Track preview visibility
+  bool _isPreviewVisible = false;
+      late FocusNode _messageFocusNode; // Added FocusNode
 
-  // Track which placeholders are used
+
   bool get _isStudentNameUsed =>
       _messageController.text.contains('{{student_name}}');
   bool get _isSchoolUsed => _messageController.text.contains('{{school}}');
@@ -437,10 +439,14 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
+  _messageFocusNode = FocusNode(); // Initialize FocusNode
+    // Request focus after the first frame is rendered
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FocusScope.of(context).requestFocus(_messageFocusNode);
+    });
 
-    // Listen to text changes to update preview and chip states
     _messageController.addListener(() {
-      setState(() {}); // Trigger rebuild to update preview and chip states
+      setState(() {});
     });
   }
 
@@ -448,10 +454,11 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
   void dispose() {
     _messageController.dispose();
     _animationController.dispose();
+        _messageFocusNode.dispose(); // Dispose FocusNode
+
     super.dispose();
   }
 
-  // Insert placeholder into the TextFormField at the current cursor position
   void _insertPlaceholder(String placeholder) {
     final text = _messageController.text;
     final textSelection = _messageController.selection;
@@ -466,13 +473,12 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
     );
   }
 
-  // Generate preview messages for up to 3 students
   List<String> _generatePreviews() {
     final message = _messageController.text.trim().isEmpty
         ? 'Type your message here (e.g., Hello Dear parent {{student_name}} at {{school}}, your child in {{classroom}} has an upcoming event...)'
         : _messageController.text.trim();
     final previews = <String>[];
-    final students = widget.selectedStudentIds.take(3).toList(); // Limit to 3
+    final students = widget.selectedStudentIds.take(3).toList();
     for (var student in students) {
       String preview = message;
       preview =
@@ -485,7 +491,6 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
     return previews;
   }
 
-  // Build a placeholder chip
   Widget _buildPlaceholderChip(String placeholder, bool isUsed) {
     return ActionChip(
       label: Text(
@@ -519,12 +524,15 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  spreadRadius: 2),
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 10,
+                spreadRadius: 2,
+              ),
             ],
           ),
           child: SingleChildScrollView(
@@ -541,8 +549,9 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                           width: 50,
                           height: 5,
                           decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(10)),
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ),
@@ -604,6 +613,7 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                         TextFormField(
                           controller: _messageController,
                           maxLines: 10,
+                           focusNode: _messageFocusNode,
                           decoration: InputDecoration(
                             hintText:
                                 'Type your message here (e.g., Hello Dear parent {{student_name}} at {{school}}, your child in {{classroom}} has an upcoming event...)',
@@ -725,41 +735,27 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                                     onPressed: () async {
                                       if (_messageController.text
                                           .trim()
-                                          .isNotEmpty) {
-                                        for (var student
-                                            in widget.selectedStudentIds) {
-                                          var parentContact = widget
-                                              .studentController
-                                              .parentContacts
-                                              .entries
-                                              .firstWhere(
-                                            (entry) => entry.key == student.id,
-                                            orElse: () => MapEntry('', ''),
-                                          );
-                                          if (parentContact.key.isNotEmpty) {
-                                            await widget.communicationController
-                                                .sendCommunication(
-                                              classroomId: widget.classroomId,
-                                              message: _messageController.text
-                                                  .trim(),
-                                              recipientIds: [
-                                                parentContact.value
-                                              ],
-                                              studentId: student.id,
-                                              isClassLevel: false,
-                                            );
-                                          }
-                                        }
-                                        if (mounted) {
-                                          Navigator.pop(context);
-                                          widget.studentController
-                                              .toggleSelectAll(false);
-                                        }
-                                      } else {
-                                        if (mounted) {
-                                          WidgetsBinding.instance
-                                              .addPostFrameCallback((_) {});
-                                        }
+                                          .isEmpty) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                              content:
+                                                  Text('Please enter a message')),
+                                        );
+                                        return;
+                                      }
+                                      final success = await widget
+                                          .communicationController
+                                          .sendBulkSms(
+                                        classroomId: widget.classroomId,
+                                        message: _messageController.text.trim(),
+                                        students: widget.selectedStudentIds,
+                                      
+                                      );
+                                      if (success && mounted) {
+                                        Navigator.pop(context);
+                                        widget.studentController
+                                            .toggleSelectAll(false);
                                       }
                                     },
                                     child: Text(
@@ -773,6 +769,35 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                                   )),
                           ],
                         ),
+                        Obx(() {
+                          if (widget.communicationController.errorMessage.value
+                              .isNotEmpty) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                widget.communicationController.errorMessage.value,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            );
+                          }
+                          if (widget.communicationController.successMessage.value
+                              .isNotEmpty) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                widget.communicationController.successMessage.value,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            );
+                          }
+                          return SizedBox.shrink();
+                        }),
                       ],
                     ),
                   ),

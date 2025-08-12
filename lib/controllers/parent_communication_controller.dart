@@ -1,7 +1,25 @@
+import 'package:attendance/models/student.model.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../utils/notifiers.dart';
+
+// Recipient model for sendBulkSms API
+class Recipient {
+  final String phone;
+  final String message;
+
+  Recipient({required this.phone, required this.message});
+
+  Map<String, dynamic> toJson() => {
+        'phone': phone,
+        'message': message,
+      };
+}
 
 class ParentCommunicationController extends GetxController {
   RxBool isLoading = false.obs;
@@ -10,126 +28,134 @@ class ParentCommunicationController extends GetxController {
   RxList<Map<String, dynamic>> messages = <Map<String, dynamic>>[].obs;
   RxList<Map<String, dynamic>> recipients = <Map<String, dynamic>>[].obs;
 
-  Future<void> fetchRecipients(String classroomId) async {
-    try {
-      isLoading.value = true;
-      errorMessage.value = '';
-      successMessage.value = '';
+  static const int _timeoutDuration = 10; // Timeout in seconds
+  static const int _maxRetries = 3; // Max retry attempts
 
-      final prefs = await SharedPreferences.getInstance();
-      final String? token = prefs.getString('token');
+  // Set headers with token
+  Future<Map<String, String>> _setHeaders(String token) async {
+    var cleanToken = token.replaceAll('"', '');
 
-      final response = await http.get(
-        Uri.parse('YOUR_API_ENDPOINT/classrooms/$classroomId/recipients'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
+    debugPrint(cleanToken);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        recipients.value = List<Map<String, dynamic>>.from(data['recipients']);
-        successMessage.value = 'Recipients loaded successfully';
-      } else {
-        errorMessage.value = 'Failed to load recipients: ${response.statusCode}';
-      }
-    } catch (e) {
-      errorMessage.value = 'Error loading recipients: $e';
-    } finally {
-      isLoading.value = false;
-    }
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': cleanToken,
+    };
   }
 
-  Future<void> sendCommunication({
+  // Generic HTTP GET with exponential backoff retry
+  Future<http.Response> _getWithRetry(
+      String url, Map<String, String> headers) async {
+    int attempt = 0;
+    while (attempt < _maxRetries) {
+      try {
+        final response = await http
+            .get(Uri.parse(url), headers: headers)
+            .timeout(Duration(seconds: _timeoutDuration));
+        return response;
+      } catch (e) {
+        attempt++;
+        if (attempt == _maxRetries) {
+          throw Exception('GET request failed after $_maxRetries attempts: $e');
+        }
+        await Future.delayed(Duration(milliseconds: 500 * (attempt * attempt)));
+      }
+    }
+    throw Exception('Unreachable code');
+  }
+
+  // Generic HTTP POST with exponential backoff retry
+  Future<http.Response> _postWithRetry(
+      String url, Map<String, String> headers, String body) async {
+    int attempt = 0;
+    while (attempt < _maxRetries) {
+      try {
+        final response = await http
+            .post(Uri.parse(url), headers: headers, body: body)
+            .timeout(Duration(seconds: _timeoutDuration));
+        return response;
+      } catch (e) {
+        attempt++;
+        if (attempt == _maxRetries) {
+          throw Exception(
+              'POST request failed after $_maxRetries attempts: $e');
+        }
+        await Future.delayed(Duration(milliseconds: 500 * (attempt * attempt)));
+      }
+    }
+    throw Exception('Unreachable code');
+  }
+
+  Future<bool> sendBulkSms({
     required String classroomId,
     required String message,
-    required List<String> recipientIds,
-    String? studentId,
-    bool isClassLevel = false,
+    required List<StudentData> students,
   }) async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
       successMessage.value = '';
 
-      final prefs = await SharedPreferences.getInstance();
-      final String? token = prefs.getString('token');
+      // Prepare recipients with customized messages
+      final recipients = students
+          .map((student) {
+            String finalMessage = message;
+            finalMessage = finalMessage.replaceAll(
+                '{{student_name}}', student.name ?? 'Student');
+            finalMessage = finalMessage.replaceAll(
+                '{{school}}', student.school ?? 'School');
+            finalMessage = finalMessage.replaceAll(
+                '{{classroom}}', student.classroom ?? 'Classroom');
+            return Recipient(
+              phone: student.parentContact ?? '',
+              message: finalMessage,
+            );
+          })
+          .where((recipient) => recipient.phone.isNotEmpty)
+          .toList();
 
-      // Fetch student name if studentId is provided
-      String finalMessage = message;
-      if (studentId != null) {
-        final studentResponse = await http.get(
-          Uri.parse('YOUR_API_ENDPOINT/students/$studentId'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        );
-
-        if (studentResponse.statusCode == 200) {
-          final studentData = jsonDecode(studentResponse.body);
-          String studentName = studentData['name'] ?? 'Student';
-          finalMessage = message.replaceAll('{{student_name}}', studentName);
-        } else {
-          // Fallback if student name can't be fetched
-          finalMessage = message.replaceAll('{{student_name}}', 'Student');
-        }
+      if (recipients.isEmpty) {
+        errorMessage.value = 'No valid parent contacts found';
+        return false;
       }
 
-      final response = await http.post(
-        Uri.parse('YOUR_API_ENDPOINT/communications'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'classroomId': classroomId,
-          'message': finalMessage,
-          'recipientIds': recipientIds,
-          'studentId': studentId,
-          'isClassLevel': isClassLevel,
-        }),
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final token = sharedPreferences.getString("token") ?? "";
+      final headers = await _setHeaders(token);
+      final baseUrl = '${dotenv.get('mainUrl')}/api/students';
+
+      final data = {
+        'sender_id': "swiftqom",
+        'recipients': recipients,
+        'message': message,
+      };
+
+      debugPrint(jsonEncode(data));
+
+      final response = await _postWithRetry(
+        '$baseUrl/bulk-parent-communication',
+        headers,
+        jsonEncode(data),
       );
 
-      if (response.statusCode == 201) {
-        successMessage.value = 'Message sent successfully';
-        messages.add(jsonDecode(response.body));
+      final results = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && results['success'] == true) {
+        showSuccessAlert(
+            results['message'] ?? 'Fee notification sent successfully',
+            Get.context!);
+        return true;
       } else {
-        errorMessage.value = 'Failed to send message: ${response.statusCode}';
+        showErrorAlert(
+            results['message'] ??
+                'Failed to notify student fee to parent: ${response.statusCode}',
+            Get.context!);
+        return false;
       }
     } catch (e) {
-      errorMessage.value = 'Error sending message: $e';
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  Future<void> fetchCommunicationHistory(String classroomId) async {
-    try {
-      isLoading.value = true;
-      errorMessage.value = '';
-      successMessage.value = '';
-
-      final prefs = await SharedPreferences.getInstance();
-      final String? token = prefs.getString('token');
-
-      final response = await http.get(
-        Uri.parse('YOUR_API_ENDPOINT/communications/$classroomId/history'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        messages.value = List<Map<String, dynamic>>.from(jsonDecode(response.body)['messages']);
-        successMessage.value = 'Communication history loaded successfully';
-      } else {
-        errorMessage.value = 'Failed to load history: ${response.statusCode}';
-      }
-    } catch (e) {
-      errorMessage.value = 'Error loading history: $e';
+      errorMessage.value = 'Error sending messages: $e';
+      return false;
     } finally {
       isLoading.value = false;
     }

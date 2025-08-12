@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:attendance/models/fee.payment.dto.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,7 +9,8 @@ import 'package:attendance/models/school.fee.type.dart';
 import 'package:attendance/controllers/school_fees_controller.dart';
 
 import '../models/classroom.fee.history.dart';
-import '../models/fee.assign.dto.dart'; // Import for StudentFeeDTO and FeePaymentDTO
+import '../models/fee.assign.dto.dart';
+import '../utils/notifiers.dart'; // Import for StudentFeeDTO and FeePaymentDTO
 
 class FeeService {
   static const int _timeoutDuration = 10; // Timeout in seconds
@@ -35,6 +37,7 @@ class FeeService {
     int attempt = 0;
     while (attempt < _maxRetries) {
       try {
+        debugPrint("request url: $url");
         final response = await http
             .get(Uri.parse(url), headers: headers)
             .timeout(Duration(seconds: _timeoutDuration));
@@ -153,15 +156,80 @@ class FeeService {
     }
   }
 
-      Future<List<ClassroomFeesData>> fetchSchoolFeeHistory() async {
-      try {
+  //     Future<List<ClassroomFeesData>> fetchSchoolFeeHistory(
+  //      {String? classroomId, String? academicYear, String? status, String? feeTypeId, String? term}) async {
+  //     try {
+  //     final sharedPreferences = await SharedPreferences.getInstance();
+  //     final token = sharedPreferences.getString("token") ?? "";
+  //     final headers = await _setHeaders(token);
+
+
+  //       final queryParams = <String, String>{};
+  //       if (classroomId != null) queryParams['classroomId'] = classroomId;
+  //       if (academicYear != null) queryParams['academicYear'] = academicYear;
+  //       if (status != null) queryParams['status'] = status;
+  //       if (feeTypeId != null) queryParams['feeTypeId'] = feeTypeId;
+  //       if (term != null) queryParams['term'] = term;
+
+  //      final response = await _getWithRetry(
+  //       '${dotenv.get('mainUrl')}/api/student-fees/school/fees$queryParams',
+  //       headers,
+  //     );
+  //     final results = jsonDecode(response.body);
+
+  //     if (response.statusCode == 200 && results['success'] == true) {
+  //       final feeHistory = (results['data'] as List?)?.map((item) => ClassroomFeesData.fromJson(item)).toList() ?? [];
+  //       return feeHistory;
+  //     } else if (response.statusCode == 404) {
+  //       // Handle no payment history case
+  //       debugPrint('No fee history found for classroomId');
+  //       return [];
+  //     } else {
+  //       final errorMessage = results['message'] ?? 'Failed to load fee history: ${response.statusCode}';
+  //       debugPrint('Error fetching fee history: $errorMessage, Response: ${response.body}');
+  //       throw Exception(errorMessage);
+  //     }
+  //   } catch (e) {
+  //     debugPrint('Error fetching fee history: $e');
+  //     throw Exception('Failed to fetch fee history: $e');
+  //   }
+  // }
+
+
+  Future<List<ClassroomFeesData>> fetchSchoolFeeHistory({
+    String? classroomId,
+    String? academicYear,
+    String? status,
+    String? feeTypeId,
+    String? term,
+  }) async {
+    try {
       final sharedPreferences = await SharedPreferences.getInstance();
       final token = sharedPreferences.getString("token") ?? "";
       final headers = await _setHeaders(token);
-       final response = await _getWithRetry(
-        '${dotenv.get('mainUrl')}/api/student-fees/school/fees',
-        headers,
-      );
+
+      // Construct URL with only non-null and non-empty query parameters
+      final baseUrl = '${dotenv.get('mainUrl')}/api/student-fees/school/fees';
+      final queryParams = <String, String>{};
+      if (classroomId != null && classroomId.isNotEmpty) {
+        queryParams['classroomId'] = classroomId;
+      }
+      if (academicYear != null && academicYear.isNotEmpty) {
+        queryParams['academicYear'] = academicYear;
+      }
+      if (status != null && status.isNotEmpty) {
+        queryParams['status'] = status;
+      }
+      if (feeTypeId != null && feeTypeId.isNotEmpty) {
+        queryParams['feeTypeId'] = feeTypeId;
+      }
+      if (term != null && term.isNotEmpty) {
+        queryParams['term'] = term;
+      }
+
+      final uri = Uri.parse(baseUrl).replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+      debugPrint('Request URL: $uri'); // Log the URL for debugging
+      final response = await _getWithRetry(uri.toString(), headers);
 
       final results = jsonDecode(response.body);
 
@@ -169,8 +237,7 @@ class FeeService {
         final feeHistory = (results['data'] as List?)?.map((item) => ClassroomFeesData.fromJson(item)).toList() ?? [];
         return feeHistory;
       } else if (response.statusCode == 404) {
-        // Handle no payment history case
-        debugPrint('No fee history found for classroomId');
+        debugPrint('No fee history found for the given filters');
         return [];
       } else {
         final errorMessage = results['message'] ?? 'Failed to load fee history: ${response.statusCode}';
@@ -182,7 +249,7 @@ class FeeService {
       throw Exception('Failed to fetch fee history: $e');
     }
   }
-
+ 
 
   // Apply a fee (single/multiple students or class-level)
   Future<StudentFeeDTO> applyFee({
@@ -195,6 +262,7 @@ class FeeService {
     List<String>? studentIds,
     String? singleStudentId,
     bool isClassLevel = false,
+    bool notifyParent = false,
   }) async {
     try {
       final sharedPreferences = await SharedPreferences.getInstance();
@@ -212,7 +280,7 @@ class FeeService {
         });
 
         final response = await _postWithRetry(
-          '$baseUrl/classroom/$classroomId/assign',
+          '$baseUrl/classroom/$classroomId/assign?sendSms=$notifyParent',
           headers,
           body,
         );
@@ -252,7 +320,7 @@ class FeeService {
         });
 
         final response = await _postWithRetry(
-          '$baseUrl/assign',
+          '$baseUrl/assign?sendSms=$notifyParent',
           headers,
           body,
         );
@@ -272,7 +340,7 @@ class FeeService {
   }
 
   // Record a payment
-  Future<FeePaymentDTO> recordPayment({
+  Future<PaymentResponseModel> recordPayment({
     required String feeId,
     required double amount,
     required String paymentMethod,
@@ -303,7 +371,8 @@ class FeeService {
       final results = jsonDecode(response.body);
 
       if (response.statusCode == 200 && results['success'] == true) {
-        return FeePaymentDTO.fromJson(results['data']);
+        debugPrint(results.toString());
+        return PaymentResponseModel.fromJson(results);
       } else {
         throw Exception(results['message'] ?? 'Failed to record payment: ${response.statusCode}');
       }
@@ -389,4 +458,37 @@ class FeeService {
       throw Exception('Failed to fetch student fees: $e');
     }
   }
+
+  Future<void> notifyStudentFeeToParent(String studentId, {bool sendSMS = true}) async {
+    try {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final token = sharedPreferences.getString("token") ?? "";
+      final headers = await _setHeaders(token);
+      final baseUrl = '${dotenv.get('mainUrl')}/api/student-fees';
+
+
+      final response = await _postWithRetry(
+        '$baseUrl/notify-overdue/student/$studentId?sendSMS=$sendSMS',
+        headers,
+        '',
+      );
+
+      final results = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && results['success'] == true) {
+        showSuccessAlert(results['message'] ?? 'Fee notification sent successfully', Get.context!);
+        return;
+      } else {
+        showErrorAlert(results['message'] ?? 'Failed to notify student fee to parent: ${response.statusCode}', Get.context!);
+        throw Exception(results['message'] ?? 'Failed to notify student fee to parent: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error notifying student fee to parent: $e');
+      throw Exception('Failed to notify student fee to parent: $e');
+    }
+  }
+
+
+
+  
 }

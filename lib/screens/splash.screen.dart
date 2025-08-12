@@ -1,19 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
-
-
-import 'package:attendance/models/user.login.model.dart';
-import 'package:attendance/routes/routes.names.dart';
-import 'package:attendance/routes/routes.provider.dart';
 import 'package:attendance/utils/colors.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../utils/constants.dart';
+class UserData {
+  UserData();
+  factory UserData.fromJson(Map<String, dynamic> json) => UserData();
+}
+
+class Strings {
+  static const String appName = 'SCHOOL';
+}
+
 
 class Splash extends StatefulWidget {
   const Splash({Key? key}) : super(key: key);
@@ -22,146 +23,229 @@ class Splash extends StatefulWidget {
   State<Splash> createState() => _SplashState();
 }
 
-class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late List<Animation<Offset>> _animations;
+class _SplashState extends State<Splash> with TickerProviderStateMixin {
+  late AnimationController _logoController;
+  late AnimationController _textController;
+  late Animation<double> _logoScale;
+  late Animation<double> _logoOpacity;
+  late List<Animation<Offset>> _letterAnimations;
+  late List<Animation<double>> _letterOpacities;
   late UserData user;
-  var json, jsonToken;
-  String? jsonCheck, jsonCode, jsonCheckProfile, token;
+  String? jsonCheck, json, jsonToken;
+
   @override
   void initState() {
     super.initState();
     user = UserData();
-    // startTime();
-    // Initialize the animation controller
-    _animationController = AnimationController(
+
+    // Logo animation controller
+    _logoController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3000),
+      duration: const Duration(milliseconds: 1200),
     );
 
-    // Create the animations
-    _animations = List.generate(
+    // Text animation controller
+    _textController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+
+    // Logo animations
+    _logoScale = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _logoController,
+        curve: Curves.easeOutBack,
+      ),
+    );
+    _logoOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _logoController,
+        curve: Curves.easeIn,
+      ),
+    );
+
+    // Text letter animations
+    _letterAnimations = List.generate(
       Strings.appName.length,
-      (index) {
-        final startPosition = Offset(
-          (index - Strings.appName.length / 2) * 48.0 + 24.0,
-          0,
-        );
-        final endPosition = Offset.zero;
-        return Tween<Offset>(
-          begin: startPosition,
-          end: endPosition,
-        ).animate(
-          CurvedAnimation(
-            parent: _animationController,
-            curve: Curves.easeInOut,
+      (index) => Tween<Offset>(
+        begin: const Offset(0, 50),
+        end: Offset.zero,
+      ).animate(
+        CurvedAnimation(
+          parent: _textController,
+          curve: Interval(
+            index * 0.1,
+            (index + 1) * 0.1 + 0.4,
+            curve: Curves.easeOutCubic,
           ),
-        );
-      },
+        ),
+      ),
     );
 
-    // Start the animation
-    _animationController.forward().whenComplete(() {
-      startTime();
+    _letterOpacities = List.generate(
+      Strings.appName.length,
+      (index) => Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(
+          parent: _textController,
+          curve: Interval(
+            index * 0.1,
+            (index + 1) * 0.1 + 0.4,
+            curve: Curves.easeIn,
+          ),
+        ),
+      ),
+    );
+
+    // Start animations
+    _logoController.forward().then((_) {
+      _textController.forward().whenComplete(() {
+        startTime();
+      });
     });
   }
 
-  startTime() async {
+  Future<Timer> startTime() async {
     final prefs = await SharedPreferences.getInstance();
     json = prefs.getString('currentUser') ?? 'no';
     jsonToken = prefs.getString('token') ?? 'no';
     jsonCheck = prefs.getString('currentUser') ?? 'no';
+
     var duration = const Duration(milliseconds: 100);
 
     if (jsonCheck == 'no') {
       return Timer(duration, navigationPage);
     } else {
-      Map<String, dynamic> map = jsonDecode(json);
+      Map<String, dynamic> map = jsonDecode(json!);
       user = UserData.fromJson(map);
-      if (kDebugMode) {
-        print("USER $json");
-        print("TOKEN  $jsonToken");
-      }
-      var duration = const Duration(seconds: 2);
+      duration = const Duration(seconds: 2);
       return Timer(duration, navigationPage);
     }
   }
 
   void navigationPage() {
-    // Check conditions in sequence
     if (jsonCheck == 'no') {
-      Get.toNamed(login);
-    }else {
-      Get.toNamed(home);
+      Get.toNamed('/login');
+    } else {
+      Get.toNamed('/home');
     }
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _logoController.dispose();
+    _textController.dispose();
     super.dispose();
   }
 
-  double bottomPaddingPercentage = 0.1;
-
   @override
   Widget build(BuildContext context) {
-    double screenHeight = MediaQuery.of(context).size.height;
-    double bottomPadding = screenHeight * bottomPaddingPercentage;
-
     return Scaffold(
-      backgroundColor: primaryColor,
-      body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(bottom: bottomPadding),
-          child: Center(
-            child: Stack(
-              children: [
-                Row(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              primaryColor,
+              primaryColor.withOpacity(0.8),
+              accentColor.withOpacity(0.9),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Center(
+                child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    Strings.appName.length,
-                    (index) => Opacity(
-                      opacity: 0,
-                      child: Text(
-                        Strings.appName[index],
-                        style: GoogleFonts.poppins(
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                          color: orangeColor,
+                  children: [
+                    // Logo
+                    AnimatedBuilder(
+                      animation: _logoController,
+                      builder: (context, child) => Transform.scale(
+                        scale: _logoScale.value,
+                        child: Opacity(
+                          opacity: _logoOpacity.value,
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: whiteColor.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Color.fromARGB(255, 2, 63, 59).withOpacity(0.2),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
+                                ),
+                              ],
+                            ),
+                            child: Image.asset(
+                              'assets/images/logo-school.png',
+                              width: 80,
+                              height: 80,
+                              color: whiteColor,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    Strings.appName.length,
-                    (index) => SlideTransition(
-                      position: _animations[index],
-                      child: Text(
-                        Strings.appName[index],
-                        style: GoogleFonts.poppins(
-                            fontSize: 60,
-                            fontWeight: FontWeight.w900,
-                            color: whiteColor),
+                    const SizedBox(height: 24),
+                    // Animated Text
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        Strings.appName.length,
+                        (index) => AnimatedBuilder(
+                          animation: _textController,
+                          builder: (context, child) => Transform.translate(
+                            offset: _letterAnimations[index].value,
+                            child: Opacity(
+                              opacity: _letterOpacities[index].value,
+                              child: Text(
+                                Strings.appName[index],
+                                style: GoogleFonts.poppins(
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.w900,
+                                  color: whiteColor,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withOpacity(0.3),
+                                      blurRadius: 10,
+                                      offset: const Offset(2, 2),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Loading Indicator
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(whiteColor),
+                      strokeWidth: 3,
+                    ),
+                  ],
+                ),
+              ),
+              // Bottom Branding
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    "Powered by Besoft & BePay Ltd",
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: whiteColor.withOpacity(0.7),
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      bottomSheet: Container(
-        color: primaryColor,
-        height: 40,
-        child: Center(
-          child: Text(
-            "Powerd by Besoft & BePay ltd",
-            style: GoogleFonts.poppins(fontSize: 12, color: whiteColor),
+              ),
+            ],
           ),
         ),
       ),
