@@ -11,7 +11,7 @@ void showErrorAlert(String message, context) {
       size: 28.0,
       color: Colors.white,
     ),
-    duration: const Duration(seconds: 40),
+    duration: const Duration(seconds: 4),
     margin: const EdgeInsets.all(30),
     borderRadius: BorderRadius.circular(10),
     flushbarPosition: FlushbarPosition.TOP,
