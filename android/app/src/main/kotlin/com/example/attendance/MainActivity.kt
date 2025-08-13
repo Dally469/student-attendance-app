@@ -1,4 +1,4 @@
-package com.example.attendance
+package com.besoft.schoolnotify
 
 import io.flutter.embedding.android.FlutterActivity
 

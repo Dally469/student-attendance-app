@@ -1,7 +1,6 @@
 import 'package:attendance/controllers/classroom_student_controller.dart';
 import 'package:attendance/controllers/parent_communication_controller.dart';
 import 'package:attendance/routes/routes.names.dart';
-import 'package:attendance/routes/routes.provider.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';

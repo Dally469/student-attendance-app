@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:attendance/api/fee.service.dart';
 import 'package:attendance/controllers/school_classroom_controller.dart';
 import 'package:attendance/models/fee.assign.dto.dart';
@@ -11,6 +13,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../api/classroom_service.dart';
 import '../models/classroom.fee.history.dart';
 import '../models/classroom.model.dart';
+import '../models/student.model.dart';
 import '../routes/routes.names.dart' as routes;
 import '../utils/notifiers.dart';
 
@@ -23,7 +26,8 @@ class SchoolFeesController extends GetxController {
   RxString successMessage = ''.obs;
   RxList<StudentFeeDTO> fees = <StudentFeeDTO>[].obs;
   RxList<ClassroomFeesData> feeHistory = <ClassroomFeesData>[].obs;
-  RxList<Map<String, dynamic>> students = <Map<String, dynamic>>[].obs;
+  RxList<StudentData> students = <StudentData>[].obs; // Changed to StudentData
+
   RxList<FeesData> feeTypes = <FeesData>[].obs;
   RxList<String> academicYears = <String>[
     '2024/2025',
@@ -36,8 +40,7 @@ class SchoolFeesController extends GetxController {
   ].obs;
 
   RxList<Classroom> classrooms = <Classroom>[].obs;
-
-
+  Timer? _debounce; // Debounce timer for search
 
   @override
   void onInit() {
@@ -66,12 +69,10 @@ class SchoolFeesController extends GetxController {
     }
   }
 
-    Future<void> getSchoolClassrooms() async {
+  Future<void> getSchoolClassrooms() async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
-
-
 
       final result = await _classroomService.fetchSchoolClassrooms();
       debugPrint("Classrooms: ${result.data!.length}");
@@ -86,7 +87,6 @@ class SchoolFeesController extends GetxController {
       isLoading.value = false;
     }
   }
-
 
   Future<void> fetchSchoolFeeHistory({
     String? classroomId,
@@ -142,7 +142,7 @@ class SchoolFeesController extends GetxController {
     );
   }
 
- void showFilterBottomSheet(BuildContext context) {
+  void showFilterBottomSheet(BuildContext context) {
     final RxString? selectedClassroom = ''.obs;
     final RxString? selectedAcademicYear = ''.obs;
     final RxString? selectedStatus = ''.obs;
@@ -187,7 +187,8 @@ class SchoolFeesController extends GetxController {
             child: Container(
               decoration: BoxDecoration(
                 color: whiteColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.15),
@@ -230,7 +231,9 @@ class SchoolFeesController extends GetxController {
                       SlideTransition(
                         position: slideAnimation,
                         child: Obx(() => DropdownButtonFormField<String>(
-                              value: selectedClassroom?.value != null && classrooms.any((c) => c.id == selectedClassroom?.value)
+                              value: selectedClassroom?.value != null &&
+                                      classrooms.any((c) =>
+                                          c.id == selectedClassroom?.value)
                                   ? selectedClassroom?.value
                                   : null,
                               hint: Text(
@@ -243,18 +246,21 @@ class SchoolFeesController extends GetxController {
                                   value: null,
                                   child: Text('All Classrooms'),
                                 ),
-                                ...classrooms.map((classroom) => DropdownMenuItem(
-                                      value: classroom.id,
-                                      child: Text(
-                                        classroom.name.toString(),
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          color: blackColor,
-                                        ),
-                                      ),
-                                    )).toList(),
+                                ...classrooms
+                                    .map((classroom) => DropdownMenuItem(
+                                          value: classroom.id,
+                                          child: Text(
+                                            classroom.name.toString(),
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 14,
+                                              color: blackColor,
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(),
                               ],
-                              onChanged: (value) => selectedClassroom?.value = value!,
+                              onChanged: (value) =>
+                                  selectedClassroom?.value = value!,
                             )),
                       ),
                       const SizedBox(height: 16),
@@ -262,31 +268,37 @@ class SchoolFeesController extends GetxController {
                       SlideTransition(
                         position: slideAnimation,
                         child: Obx(() => DropdownButtonFormField<String>(
-                              value: selectedAcademicYear?.value != null && academicYears.contains(selectedAcademicYear?.value)
+                              value: selectedAcademicYear?.value != null &&
+                                      academicYears
+                                          .contains(selectedAcademicYear?.value)
                                   ? selectedAcademicYear?.value
                                   : null,
                               hint: Text(
                                 'Select Academic Year',
                                 style: GoogleFonts.poppins(color: greyColor1),
                               ),
-                              decoration: _buildInputDecoration('Academic Year'),
+                              decoration:
+                                  _buildInputDecoration('Academic Year'),
                               items: [
                                 const DropdownMenuItem<String>(
                                   value: null,
                                   child: Text('All Years'),
                                 ),
-                                ...academicYears.map((year) => DropdownMenuItem(
-                                      value: year,
-                                      child: Text(
-                                        year,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          color: blackColor,
-                                        ),
-                                      ),
-                                    )).toList(),
+                                ...academicYears
+                                    .map((year) => DropdownMenuItem(
+                                          value: year,
+                                          child: Text(
+                                            year,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 14,
+                                              color: blackColor,
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(),
                               ],
-                              onChanged: (value) => selectedAcademicYear?.value = value!,
+                              onChanged: (value) =>
+                                  selectedAcademicYear?.value = value!,
                             )),
                       ),
                       const SizedBox(height: 16),
@@ -294,31 +306,39 @@ class SchoolFeesController extends GetxController {
                       SlideTransition(
                         position: slideAnimation,
                         child: Obx(() => DropdownButtonFormField<String>(
-                              value: selectedStatus?.value != null && ['PAID', 'UNPAID', 'PARTIALLY_PAID'].contains(selectedStatus?.value)
+                              value: selectedStatus?.value != null &&
+                                      ['PAID', 'UNPAID', 'PARTIALLY_PAID']
+                                          .contains(selectedStatus?.value)
                                   ? selectedStatus?.value
                                   : null,
                               hint: Text(
                                 'Select Status',
                                 style: GoogleFonts.poppins(color: greyColor1),
                               ),
-                              decoration: _buildInputDecoration('Payment Status'),
+                              decoration:
+                                  _buildInputDecoration('Payment Status'),
                               items: [
                                 const DropdownMenuItem<String>(
                                   value: null,
                                   child: Text('All Statuses'),
                                 ),
-                                ...['PAID', 'UNPAID', 'PARTIALLY_PAID'].map((status) => DropdownMenuItem(
-                                      value: status,
-                                      child: Text(
-                                        status.replaceAll('_', ' ').capitalize!,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          color: blackColor,
-                                        ),
-                                      ),
-                                    )).toList(),
+                                ...['PAID', 'UNPAID', 'PARTIALLY_PAID']
+                                    .map((status) => DropdownMenuItem(
+                                          value: status,
+                                          child: Text(
+                                            status
+                                                .replaceAll('_', ' ')
+                                                .capitalize!,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 14,
+                                              color: blackColor,
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(),
                               ],
-                              onChanged: (value) => selectedStatus?.value = value!,
+                              onChanged: (value) =>
+                                  selectedStatus?.value = value!,
                             )),
                       ),
                       const SizedBox(height: 16),
@@ -326,7 +346,9 @@ class SchoolFeesController extends GetxController {
                       SlideTransition(
                         position: slideAnimation,
                         child: Obx(() => DropdownButtonFormField<String>(
-                              value: selectedFeeType?.value != null && feeTypes.any((f) => f.id == selectedFeeType?.value)
+                              value: selectedFeeType?.value != null &&
+                                      feeTypes.any(
+                                          (f) => f.id == selectedFeeType?.value)
                                   ? selectedFeeType?.value
                                   : null,
                               hint: Text(
@@ -339,18 +361,21 @@ class SchoolFeesController extends GetxController {
                                   value: null,
                                   child: Text('All Fee Types'),
                                 ),
-                                ...feeTypes.map((feeType) => DropdownMenuItem(
-                                      value: feeType.id,
-                                      child: Text(
-                                        feeType.name.toString(),
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          color: blackColor,
-                                        ),
-                                      ),
-                                    )).toList(),
+                                ...feeTypes
+                                    .map((feeType) => DropdownMenuItem(
+                                          value: feeType.id,
+                                          child: Text(
+                                            feeType.name.toString(),
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 14,
+                                              color: blackColor,
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(),
                               ],
-                              onChanged: (value) => selectedFeeType?.value = value!,
+                              onChanged: (value) =>
+                                  selectedFeeType?.value = value!,
                             )),
                       ),
                       const SizedBox(height: 16),
@@ -358,7 +383,8 @@ class SchoolFeesController extends GetxController {
                       SlideTransition(
                         position: slideAnimation,
                         child: Obx(() => DropdownButtonFormField<String>(
-                              value: selectedTerm?.value != null && terms.contains(selectedTerm?.value)
+                              value: selectedTerm?.value != null &&
+                                      terms.contains(selectedTerm?.value)
                                   ? selectedTerm?.value
                                   : null,
                               hint: Text(
@@ -371,18 +397,21 @@ class SchoolFeesController extends GetxController {
                                   value: null,
                                   child: Text('All Terms'),
                                 ),
-                                ...terms.map((term) => DropdownMenuItem(
-                                      value: term,
-                                      child: Text(
-                                        term,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          color: blackColor,
-                                        ),
-                                      ),
-                                    )).toList(),
+                                ...terms
+                                    .map((term) => DropdownMenuItem(
+                                          value: term,
+                                          child: Text(
+                                            term,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 14,
+                                              color: blackColor,
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(),
                               ],
-                              onChanged: (value) => selectedTerm ?.value = value!,
+                              onChanged: (value) =>
+                                  selectedTerm?.value = value!,
                             )),
                       ),
                       const SizedBox(height: 24),
@@ -399,7 +428,9 @@ class SchoolFeesController extends GetxController {
                                 selectedFeeType?.value = '';
                                 selectedTerm?.value = '';
                                 fetchSchoolFeeHistory();
-                                animationController.reverse().then((_) => Navigator.pop(context));
+                                animationController
+                                    .reverse()
+                                    .then((_) => Navigator.pop(context));
                                 Get.snackbar(
                                   'Success',
                                   'Filters cleared',
@@ -421,7 +452,8 @@ class SchoolFeesController extends GetxController {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primaryColor,
                                 foregroundColor: whiteColor,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, vertical: 12),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -435,7 +467,7 @@ class SchoolFeesController extends GetxController {
                                   feeTypeId: selectedFeeType?.value,
                                   term: selectedTerm?.value,
                                 );
-                               Navigator.pop(context);
+                                Navigator.pop(context);
                                 if (errorMessage.value.isNotEmpty) {
                                   Get.snackbar(
                                     'Error',
@@ -476,6 +508,7 @@ class SchoolFeesController extends GetxController {
       },
     ).whenComplete(() => animationController.dispose());
   }
+
   Future<void> applyFee({
     required String classroomId,
     required String feeTypeId,
@@ -514,11 +547,12 @@ class SchoolFeesController extends GetxController {
         await fetchSchoolFeeHistory();
       }
 
+      Navigator.pop(Get.context!);
+
       Get.toNamed(routes.feeHistory, parameters: {
         'classroomId': classroomId,
         'classroom': feeTypeId,
       });
-      Get.back();
     } catch (e) {
       errorMessage.value = 'Error applying fee: ${e.toString()}';
     } finally {
@@ -611,5 +645,50 @@ class SchoolFeesController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+// Updated searchStudents with debouncing
+  Future<void> searchStudents(String query) async {
+    // Cancel previous debounce timer
+    _debounce?.cancel();
+
+    // Validate query
+    if (query.trim().isEmpty) {
+      students.clear();
+      errorMessage.value = 'Please enter a valid search query';
+      showErrorAlert(errorMessage.value, Get.context!);
+      return;
+    }
+
+    // Debounce search by 500ms
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
+      try {
+        isLoading.value = true;
+        errorMessage.value = '';
+        successMessage.value = '';
+
+        final result = await _feeService.searchStudents(query);
+        if (result.success == true && result.data != null) {
+          students.value = result.data!;
+          debugPrint(result.data!.toString());
+          successMessage.value = result.data!.isNotEmpty
+              ? 'Students loaded successfully'
+              : 'No students found for the query';
+          if (result.data!.isEmpty && Get.context != null) {
+            showSuccessAlert(successMessage.value, Get.context!);
+          }
+        } else {
+          students.clear();
+          errorMessage.value = result.message ?? 'Failed to load students';
+          showErrorAlert(errorMessage.value, Get.context!);
+        }
+      } catch (e) {
+        students.clear();
+        errorMessage.value = 'Error loading students: ${e.toString()}';
+        showErrorAlert(errorMessage.value, Get.context!);
+      } finally {
+        isLoading.value = false;
+      }
+    });
   }
 }

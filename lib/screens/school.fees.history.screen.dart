@@ -94,16 +94,16 @@ class _FeeHistoryState extends State<FeeHistory> with SingleTickerProviderStateM
        _animationController.forward();
     } catch (e) {
       debugPrint('Error initializing data: $e');
-      Get.snackbar(
-        'Error',
-        'Failed to load initial data: $e',
-        backgroundColor: Colors.red,
-        colorText: whiteColor,
-        snackPosition: SnackPosition.TOP,
-      );
+      // Get.snackbar(
+      //   'Error',
+      //   'Failed to load initial data: $e',
+      //   backgroundColor: Colors.red,
+      //   colorText: whiteColor,
+      //   snackPosition: SnackPosition.TOP,
+      // );
     } finally {
       _isInitialLoading.value = false;
-      _schoolFeesController.isLoading.value = false;
+      // _schoolFeesController.isLoading.value = false;
     }
   }
 

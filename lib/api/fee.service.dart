@@ -10,6 +10,7 @@ import 'package:attendance/controllers/school_fees_controller.dart';
 
 import '../models/classroom.fee.history.dart';
 import '../models/fee.assign.dto.dart';
+import '../models/student.model.dart';
 import '../utils/notifiers.dart'; // Import for StudentFeeDTO and FeePaymentDTO
 
 class FeeService {
@@ -262,7 +263,7 @@ class FeeService {
     List<String>? studentIds,
     String? singleStudentId,
     bool isClassLevel = false,
-    bool notifyParent = false,
+    bool notifyParent = true,
   }) async {
     try {
       final sharedPreferences = await SharedPreferences.getInstance();
@@ -289,6 +290,8 @@ class FeeService {
         debugPrint(results.toString());
 
         if (response.statusCode == 200 && results['success'] == true) {
+
+          showSuccessAlert(results['message'], Get.context!);
           return StudentFeeDTO(
             id: 'class-level-', // Placeholder ID
             studentId: '',
@@ -328,6 +331,7 @@ class FeeService {
         final results = jsonDecode(response.body);
 
         if (response.statusCode == 200 && results['success'] == true) {
+          showSuccessAlert(results['message'], Get.context!);
           return StudentFeeDTO.fromJson(results['data']);
         } else {
           throw Exception(results['message'] ?? 'Failed to assign fee: ${response.statusCode}');
@@ -335,6 +339,7 @@ class FeeService {
       }
     } catch (e) {
       print('Error applying fee: $e');
+      showErrorAlert(e.toString(), Get.context!);
       throw Exception('Failed to apply fee: $e');
     }
   }
@@ -468,7 +473,7 @@ class FeeService {
 
 
       final response = await _postWithRetry(
-        '$baseUrl/notify-overdue/student/$studentId?sendSMS=$sendSMS',
+        '$baseUrl/notify-overdue/student/$studentId?sendSms=$sendSMS',
         headers,
         '',
       );
@@ -488,7 +493,71 @@ class FeeService {
     }
   }
 
+// Updated searchStudents method
+  Future<StudentModel> searchStudents(String query) async {
+    try {
+      if (query.trim().isEmpty) {
+        return StudentModel(
+          status: 400,
+          success: false,
+          message: 'Search query cannot be empty',
+          data: [],
+        );
+      }
 
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final token = sharedPreferences.getString("token") ?? "";
+      // final schoolId = sharedPreferences.getString("schoolId") ?? "";
+      if (token.isEmpty) {
+        throw Exception('Authentication token not found');
+      }
 
-  
+      // Generate a cache key based on query and schoolId
+      final cacheKey = 'search_students_${query.hashCode}';
+      final cachedResults = sharedPreferences.getString(cacheKey);
+      final cacheTimestamp = sharedPreferences.getInt('${cacheKey}_timestamp');
+      if (cachedResults != null &&
+          cacheTimestamp != null &&
+          DateTime.now().millisecondsSinceEpoch - cacheTimestamp < _cacheDuration.inMilliseconds) {
+        final jsonData = jsonDecode(cachedResults);
+        return StudentModel.fromJson(jsonData);
+      }
+
+      final headers = await _setHeaders(token);
+      final response = await _getWithRetry(
+        '${dotenv.get('mainUrl')}/api/students/search?query=${Uri.encodeQueryComponent(query)}',
+        headers,
+      );
+
+      final results = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        final studentModel = StudentModel.fromJson(results);
+        // Cache the response
+        await sharedPreferences.setString(cacheKey, response.body);
+        await sharedPreferences.setInt('${cacheKey}_timestamp', DateTime.now().millisecondsSinceEpoch);
+        debugPrint('Service - Students cached successfully for query: $query');
+        return studentModel;
+      } else if (response.statusCode == 400) {
+        return StudentModel(
+          status: 400,
+          success: false,
+          message: results['message'] ?? 'Invalid search query',
+          data: [],
+        );
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthorized: Invalid token');
+      } else {
+        throw Exception(results['message'] ?? 'Failed to search students: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error searching students: $e');
+      return StudentModel(
+        status: 500,
+        success: false,
+        message: 'Failed to search students: $e',
+        data: [],
+      );
+    }
+  }
 }
