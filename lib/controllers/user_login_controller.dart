@@ -1,5 +1,6 @@
 import 'package:attendance/api/auth.service.dart';
 import 'package:attendance/models/user.login.model.dart';
+import 'package:attendance/routes/routes.names.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -42,7 +43,11 @@ class UserLoginController extends GetxController {
       
       if (result.success) {
         user.value = result;
-        Get.offAllNamed('/home'); // Navigate to home page after successful login
+        if(result.data?.role == "ADMIN") {
+          Get.offAllNamed(schoolsRoute); // Navigate to home page after successful login
+        } else {
+          Get.offAllNamed('/home'); // Navigate to dashboard page after successful login
+        }
       } else {
         errorMessage.value = result.message ?? 'Login failed';
         Get.snackbar('Error', errorMessage.value);

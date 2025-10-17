@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "666457075714",
+    "firebase_url": "https://taxi-9ba47.firebaseio.com",
+    "project_id": "taxi-9ba47",
+    "storage_bucket": "taxi-9ba47.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:666457075714:android:8845be9773fd796ebaf71b",
+        "android_client_info": {
+          "package_name": "com.besoft.schoolnotify"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9IefdknCCpLscfXK7yaPYDAC54L9th64"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:666457075714:android:67c6faf85950cf08baf71b",
+        "android_client_info": {
+          "package_name": "com.carnayo.taxi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9IefdknCCpLscfXK7yaPYDAC54L9th64"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:666457075714:android:6876d946f00d60a6baf71b",
+        "android_client_info": {
+          "package_name": "com.example.leazi_tenant_portal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9IefdknCCpLscfXK7yaPYDAC54L9th64"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

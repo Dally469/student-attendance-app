@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:attendance/controllers/classroom_student_controller.dart';
 import 'package:attendance/controllers/parent_communication_controller.dart';
+import 'package:attendance/controllers/sms.controller.dart';
 import 'package:attendance/routes/routes.names.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:flutter/foundation.dart';
@@ -7,6 +10,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 
 import '../models/student.model.dart';
 
@@ -19,17 +25,13 @@ class ParentCommunication extends StatefulWidget {
   State<ParentCommunication> createState() => _ParentCommunicationState();
 }
 
-class _ParentCommunicationState extends State<ParentCommunication>
-    with SingleTickerProviderStateMixin {
+class _ParentCommunicationState extends State<ParentCommunication> {
   final ClassroomStudentController _studentController =
       Get.find<ClassroomStudentController>();
+      final SMSController _smsController = Get.find<SMSController>();
   final ParentCommunicationController _communicationController =
       Get.find<ParentCommunicationController>();
   final RxString _filterOption = 'all'.obs;
-  late AnimationController _animationController;
-  late Animation<double> _fabAnimation;
-
-
 
   @override
   void initState() {
@@ -39,49 +41,10 @@ class _ParentCommunicationState extends State<ParentCommunication>
           "${widget.classroomId ?? 'Unknown ID'} - ${widget.classroom ?? 'Unknown Classroom'}");
     }
     _studentController.getStudentsByClassroomId(widget.classroom ?? "");
- 
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _fabAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
+  getCurrentUserInfo();
 
-    // // Snackbar logic with mounted check
-    // ever(_communicationController.successMessage, (message) {
-    //   if (message.isNotEmpty && mounted) {
-    //     WidgetsBinding.instance.addPostFrameCallback((_) {
-    //       Get.snackbar('Success', message, backgroundColor: Colors.green, colorText: Colors.white);
-    //     });
-    //   }
-    // });
-
-    // ever(_communicationController.errorMessage, (message) {
-    //   if (message.isNotEmpty && mounted) {
-    //     WidgetsBinding.instance.addPostFrameCallback((_) {
-    //       Get.snackbar('Error', message, backgroundColor: Colors.red, colorText: Colors.white);
-    //     });
-    //   }
-    // });
-
-    ever(_studentController.selectedStudentIds, (_) {
-      if (mounted) {
-        if (kDebugMode) {
-          print(
-              "Selected student IDs updated: ${_studentController.selectedStudentIds}");
-        }
-        if (_studentController.selectedStudentIds.isNotEmpty) {
-          _animationController.forward();
-        } else {
-          _animationController.reverse();
-        }
-      }
-    });
-
-    // Listen to filter changes to clear selections if needed
+    // Listen to filter changes to clear selections
     ever(_filterOption, (_) {
-      // Clear selections when filter changes to avoid stale IDs
       _studentController.toggleSelectAll(false, filter: _filterOption.value);
       if (kDebugMode) {
         print("Filter changed to: ${_filterOption.value}, cleared selections");
@@ -89,16 +52,47 @@ class _ParentCommunicationState extends State<ParentCommunication>
     });
   }
 
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
+    Future<void> getCurrentUserInfo() async {
+    try {
+      _smsController.isLoading.value = true;
+      SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
+      String? userJson = sharedPreferences.getString("currentUser");
+      if (userJson != null) {
+        Map<String, dynamic> userMap = jsonDecode(userJson);
+        setState(() {
+          if (userMap.containsKey('school') && userMap['school'] != null) {
+        
+            _smsController.schoolId = userMap['school']['id'];
+          }
+        });
+        debugPrint("School ID: ${userMap['school']['id']}");
+        await _smsController.getSMSBalance();
+      }
+    } catch (e) {
+      debugPrint('Error getting user info: $e');
+      _smsController.errorMessage.value = 'Error getting user info: $e';
+    } finally {
+      _smsController.isLoading.value = false;
+    }
   }
 
   Future<bool> _onWillPop() async => true;
 
-  void _showComposeMessageSheet() {
-    // _studentController.fetchParentContacts(_studentController.selectedStudentIds);
+  void _showMessageTypeSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _MessageTypeSheet(
+        onSelect: (isWhatsApp) {
+          Navigator.pop(context); // Close message type sheet
+          _showComposeMessageSheet(isWhatsApp: isWhatsApp);
+        },
+      ),
+    );
+  }
+
+  void _showComposeMessageSheet({required bool isWhatsApp}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -108,6 +102,7 @@ class _ParentCommunicationState extends State<ParentCommunication>
         selectedStudentIds: _studentController.selectedStudentIds,
         communicationController: _communicationController,
         studentController: _studentController,
+        isWhatsApp: isWhatsApp,
       ),
     );
   }
@@ -145,25 +140,17 @@ class _ParentCommunicationState extends State<ParentCommunication>
             ],
           ),
         ),
-        floatingActionButton:
-            Obx(() => _studentController.selectedStudentIds.isNotEmpty
-                ? ScaleTransition(
-                    scale: _fabAnimation,
-                    child: FloatingActionButton.extended(
-                      onPressed: _showComposeMessageSheet,
-                      backgroundColor: primaryColor,
-                      label: Text(
-                        'Compose Message',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      icon: const Icon(Icons.message, color: Colors.white),
-                    ),
-                  )
-                : const SizedBox.shrink()),
+        floatingActionButton: Obx(() {
+          if (_studentController.selectedStudentIds.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          return FloatingActionButton(
+            onPressed: _showMessageTypeSheet,
+            backgroundColor: primaryColor,
+            child: const Icon(Icons.message, color: Colors.white),
+            heroTag: 'message_fab',
+          );
+        }),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
         body: Obx(() {
           if (_studentController.isLoading.value) {
@@ -198,41 +185,58 @@ class _ParentCommunicationState extends State<ParentCommunication>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        Obx(() {
-                          final filteredStudents = _studentController
-                              .getFilteredStudents(_filterOption.value);
-                          final allSelected = filteredStudents.isNotEmpty &&
-                              _studentController.selectedStudentIds.length ==
-                                  filteredStudents.length &&
-                              filteredStudents.every((student) =>
-                                  _studentController.selectedStudentIds
-                                      .contains(student.id.toString()));
-                          return Checkbox(
-                            value: allSelected,
-                            onChanged: (value) {
-                              _studentController.toggleSelectAll(value ?? false,
-                                  filter: _filterOption.value);
-                              if (kDebugMode) {
-                                print(
-                                    "Select All toggled: $value, filter: ${_filterOption.value}");
-                              }
-                            },
-                            activeColor: primaryColor,
-                          );
-                        }),
-                        Text(
-                          "Select All Students",
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black,
+                    Obx(() {
+                      final filteredStudents = _studentController
+                          .getFilteredStudents(_filterOption.value);
+                      final selectedCount =
+                          _studentController.selectedStudentIds.length;
+                      final unselectedCount =
+                          filteredStudents.length - selectedCount;
+                      final allSelected = filteredStudents.isNotEmpty &&
+                          selectedCount == filteredStudents.length;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Checkbox(
+                                value: allSelected,
+                                onChanged: (value) {
+                                  _studentController.toggleSelectAll(
+                                      value ?? false,
+                                      filter: _filterOption.value);
+                                  if (kDebugMode) {
+                                    print(
+                                        "Select All toggled: $value, filter: ${_filterOption.value}");
+                                  }
+                                },
+                                activeColor: primaryColor,
+                              ),
+                              Text(
+                                "Select All Students",
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 18.0),
+                            child: Text(
+                              "Selected: $selectedCount | Not Selected: $unselectedCount",
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
                     const SizedBox(height: 16),
                     Obx(() {
                       final filteredStudents = _studentController
@@ -307,7 +311,7 @@ class _ParentCommunicationState extends State<ParentCommunication>
                               onTap: () {
                                 final isSelected = !_studentController
                                     .selectedStudentIds
-                                    .contains(student);
+                                    .contains(student.id.toString());
                                 _studentController.toggleStudentSelection(
                                     student, isSelected);
                                 if (kDebugMode) {
@@ -352,45 +356,197 @@ class _ParentCommunicationState extends State<ParentCommunication>
       ),
     );
   }
+}
 
-  Widget _buildStatCard(
-      String title, String count, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+// Message type selection bottom sheet
+class _MessageTypeSheet extends StatelessWidget {
+  final Function(bool) onSelect;
+
+  const _MessageTypeSheet({required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.4,
+      minChildSize: 0.3,
+      maxChildSize: 0.5,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 10,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: SingleChildScrollView(
+            controller: scrollController,
+            child: Column(
               children: [
-                Text(
-                  count,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: color,
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12.0),
+                    child: Container(
+                      width: 50,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
                 ),
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: color.withOpacity(0.8),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Select Message Type',
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: blackColor,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      GestureDetector(
+                        onTap: () => onSelect(true),
+                        child: Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.green.shade400,
+                                  Colors.green.shade600
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.message,
+                                    color: Colors.white, size: 28),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'WhatsApp Message',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Send a message or media via WhatsApp',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w400,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      GestureDetector(
+                        onTap: () => onSelect(false),
+                        child: Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  primaryColor,
+                                  primaryColor.withOpacity(0.8)
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.sms, color: Colors.white, size: 28),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'SMS Message',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Send a text message via SMS',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w400,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -400,12 +556,14 @@ class _ComposeMessageSheet extends StatefulWidget {
   final RxList<StudentData> selectedStudentIds;
   final ParentCommunicationController communicationController;
   final ClassroomStudentController studentController;
+  final bool isWhatsApp;
 
   const _ComposeMessageSheet({
     required this.classroomId,
     required this.selectedStudentIds,
     required this.communicationController,
     required this.studentController,
+    required this.isWhatsApp,
   });
 
   @override
@@ -418,8 +576,9 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _isPreviewVisible = false;
-      late FocusNode _messageFocusNode; // Added FocusNode
-
+  late FocusNode _messageFocusNode;
+  File? _selectedFile;
+  String? _fileType; // 'image' or 'document'
 
   bool get _isStudentNameUsed =>
       _messageController.text.contains('{{student_name}}');
@@ -438,8 +597,7 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
-  _messageFocusNode = FocusNode(); // Initialize FocusNode
-    // Request focus after the first frame is rendered
+    _messageFocusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FocusScope.of(context).requestFocus(_messageFocusNode);
     });
@@ -453,9 +611,29 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
   void dispose() {
     _messageController.dispose();
     _animationController.dispose();
-        _messageFocusNode.dispose(); // Dispose FocusNode
-
+    _messageFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
+    );
+
+    if (result != null && result.files.single.path != null) {
+      if (result.files.single.size > 10 * 1024 * 1024) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File size exceeds 10MB limit')),
+        );
+        return;
+      }
+      setState(() {
+        _selectedFile = File(result.files.single.path!);
+        _fileType =
+            result.files.single.extension == 'pdf' ? 'document' : 'image';
+      });
+    }
   }
 
   void _insertPlaceholder(String placeholder) {
@@ -572,7 +750,9 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Compose Message',
+                          widget.isWhatsApp
+                              ? 'Compose WhatsApp Message'
+                              : 'Compose Message',
                           style: GoogleFonts.poppins(
                             fontSize: 20,
                             fontWeight: FontWeight.w600,
@@ -581,7 +761,7 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Send a message to ${widget.selectedStudentIds.length} selected ${widget.selectedStudentIds.length == 1 ? 'student' : 'students'}',
+                          'Send a ${widget.isWhatsApp ? 'WhatsApp' : 'SMS'} message to ${widget.selectedStudentIds.length} selected ${widget.selectedStudentIds.length == 1 ? 'student' : 'students'}',
                           style: GoogleFonts.poppins(
                             fontSize: 14,
                             fontWeight: FontWeight.w400,
@@ -589,6 +769,58 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                           ),
                         ),
                         const SizedBox(height: 8),
+                        Visibility(
+                          visible: false,
+                          child: Column(
+                            children: [
+                              Text(
+                                'Upload an image or document (optional):',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: _pickFile,
+                                    icon: const Icon(Icons.upload_file,
+                                        color: Colors.white),
+                                    label: Text(
+                                      'Pick File',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  if (_selectedFile != null)
+                                    Expanded(
+                                      child: Text(
+                                        'Selected: ${_selectedFile!.path.split('/').last}',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                        overflow: TextOverflow.ellipsis, 
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          ),
+                        ),
                         Text(
                           'Tap below to insert placeholders (used placeholders are disabled):',
                           style: GoogleFonts.poppins(
@@ -612,7 +844,7 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                         TextFormField(
                           controller: _messageController,
                           maxLines: 10,
-                           focusNode: _messageFocusNode,
+                          focusNode: _messageFocusNode,
                           decoration: InputDecoration(
                             hintText:
                                 'Type your message here (e.g., Hello Dear parent {{student_name}} at {{school}}, your child in {{classroom}} has an upcoming event...)',
@@ -723,7 +955,9 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                                 ? CircularProgressIndicator(color: primaryColor)
                                 : ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: primaryColor,
+                                      backgroundColor: widget.isWhatsApp
+                                          ? Colors.green
+                                          : primaryColor,
                                       foregroundColor: whiteColor,
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 24, vertical: 12),
@@ -737,28 +971,88 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                                           .isEmpty) {
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
-                                          SnackBar(
-                                              content:
-                                                  Text('Please enter a message')),
+                                          const SnackBar(
+                                              content: Text(
+                                                  'Please enter a message')),
                                         );
                                         return;
                                       }
-                                      final success = await widget
-                                          .communicationController
-                                          .sendBulkSms(
-                                        classroomId: widget.classroomId,
-                                        message: _messageController.text.trim(),
-                                        students: widget.selectedStudentIds,
-                                      
-                                      );
-                                      if (success && mounted) {
-                                        Navigator.pop(context);
-                                        widget.studentController
-                                            .toggleSelectAll(false);
+                                      bool success = false;
+                                      if (widget.isWhatsApp) {
+                                        if (_selectedFile != null) {
+                                          String? fileUrl = await widget
+                                              .communicationController
+                                              .uploadFileToFirebase(
+                                                  _selectedFile!,
+                                                  _selectedFile!.path
+                                                      .split('/')
+                                                      .last);
+                                          if (fileUrl == null) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                  content: Text(
+                                                      'Failed to upload file')),
+                                            );
+                                            return;
+                                          }
+                                          if (_fileType == 'image') {
+                                            success = await widget
+                                                .communicationController
+                                                .sendWhatsAppImage(
+                                              classroomId: widget.classroomId,
+                                              caption: _messageController.text
+                                                  .trim(),
+                                              imageUrl: fileUrl,
+                                              students:
+                                                  widget.selectedStudentIds,
+                                            );
+                                          } else if (_fileType == 'document') {
+                                            success = await widget
+                                                .communicationController
+                                                .sendWhatsAppDocument(
+                                              classroomId: widget.classroomId,
+                                              caption: _messageController.text
+                                                  .trim(),
+                                              documentUrl: fileUrl,
+                                              documentName: _selectedFile!.path
+                                                  .split('/')
+                                                  .last,
+                                              students:
+                                                  widget.selectedStudentIds,
+                                            );
+                                          }
+                                        } else {
+                                          success = await widget
+                                              .communicationController
+                                              .sendBulkWhatsApp(
+                                            message:
+                                                _messageController.text.trim(),
+                                            students: widget.selectedStudentIds,
+                                          );
+                                        }
+                                      } else {
+                                        success = await widget
+                                            .communicationController
+                                            .sendBulkSms(
+                                          classroomId: widget.classroomId,
+                                          message:
+                                              _messageController.text.trim(),
+                                          students: widget.selectedStudentIds,
+                                        );
                                       }
+                                      // if (success && mounted) {
+                                      //   Navigator.pop(context);
+
+                                      // }
+
+                                      widget.studentController
+                                          .toggleSelectAll(false);
                                     },
                                     child: Text(
-                                      'Send Message',
+                                      widget.isWhatsApp
+                                          ? 'Send WhatsApp'
+                                          : 'Send Message',
                                       style: GoogleFonts.poppins(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
@@ -774,7 +1068,8 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                             return Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
-                                widget.communicationController.errorMessage.value,
+                                widget
+                                    .communicationController.errorMessage.value,
                                 style: GoogleFonts.poppins(
                                   fontSize: 14,
                                   color: Colors.red,
@@ -782,12 +1077,13 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                               ),
                             );
                           }
-                          if (widget.communicationController.successMessage.value
-                              .isNotEmpty) {
+                          if (widget.communicationController.successMessage
+                              .value.isNotEmpty) {
                             return Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
-                                widget.communicationController.successMessage.value,
+                                widget.communicationController.successMessage
+                                    .value,
                                 style: GoogleFonts.poppins(
                                   fontSize: 14,
                                   color: Colors.green,
@@ -795,7 +1091,7 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                               ),
                             );
                           }
-                          return SizedBox.shrink();
+                          return const SizedBox.shrink();
                         }),
                       ],
                     ),

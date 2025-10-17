@@ -26,16 +26,29 @@ class AttendanceService {
   }
 
   // Method for checking in a student - wrapper for compatibility with controller
-  Future<CheckInModel> checkInStudent(String studentId, String classroomId, String attendanceId) async {
+  Future<CheckInModel> checkInStudent(
+    String studentId,
+    String classroomId,
+    String attendanceId, {
+    String deviceType = 'MANUAL',
+    String? deviceIdentifier,
+    String? notes,
+    String? checkTime,
+  }) async {
     // Call the legacy method and convert the result
     legacy.CheckInModel legacyResult = await markAttendance(
       studentId: studentId,
       classroomId: classroomId,
       attendanceId: attendanceId,
+      deviceType: deviceType,
+      deviceIdentifier: deviceIdentifier,
+      notes: notes,
+      checkTime: checkTime,
     );
     
     // Convert legacy model to new model
     return CheckInModel(
+      statusCode: legacyResult.status,
       success: legacyResult.success,
       message: legacyResult.message,
       data: legacyResult.data != null ? CheckInData(
@@ -43,8 +56,11 @@ class AttendanceService {
         studentId: legacyResult.data?.studentId,
         studentName: legacyResult.data?.studentName,
         checkInTime: legacyResult.data?.checkInTime,
+        checkOutTime: legacyResult.data?.checkOutTime,
         status: legacyResult.data?.status,
         attendanceId: legacyResult.data?.attendanceId,
+        deviceType: legacyResult.data?.deviceType,
+        deviceIdentifier: legacyResult.data?.deviceIdentifier,
       ) : null,
     );
   }
@@ -53,6 +69,10 @@ class AttendanceService {
     required String studentId,
     required String classroomId,
     required String attendanceId,
+    String deviceType = 'MANUAL',
+    String? deviceIdentifier,
+    String? notes,
+    String? checkTime,
   }) async {
     try {
       var connectivityResult = await Connectivity().checkConnectivity();
@@ -68,17 +88,36 @@ class AttendanceService {
           'Authorization': '${token.toString()}}',
         };
 
-        var response = await http.post(
-            Uri.parse('${dotenv.get('mainUrl')}/api/attendance/check-in'),
-            headers: headers,
-            body: json.encode({
-              'studentId': studentId,
-              'classroomId': classroomId,
-              'attendanceId': attendanceId,
-            }));
+        // Build query parameters
+        final queryParams = <String, String>{
+          'deviceType': deviceType,
+        };
+        if (deviceIdentifier != null && deviceIdentifier.isNotEmpty) {
+          queryParams['deviceIdentifier'] = deviceIdentifier;
+        }
+        if (notes != null && notes.isNotEmpty) {
+          queryParams['notes'] = notes;
+        }
+        if (checkTime != null && checkTime.isNotEmpty) {
+          queryParams['checkTime'] = checkTime;
+        }
 
+        final uri = Uri.parse(
+          '${dotenv.get('mainUrl')}/api/attendance/check-in/$attendanceId/student/$studentId'
+        ).replace(queryParameters: queryParams);
+        
+        print('=== POST Check-In Request ===');
+        print('URL: $uri');
+        print('Headers: $headers');
+        print('Query Params: $queryParams');
+
+        var response = await http.post(uri, headers: headers);
+
+        print('Response Status: ${response.statusCode}');
+        print('Response Body: ${response.body}');
+        print('=============================');
+        
         Map<String, dynamic> results = jsonDecode(response.body);
-        print(results);
 
         if (response.statusCode == 200) {
           return legacy.CheckInModel.fromJson(results);
@@ -110,6 +149,85 @@ class AttendanceService {
           success: true,
           status: 200,
           message: 'Stored offline, will sync when online',
+        );
+      }
+    } catch (e) {
+      return legacy.CheckInModel(
+        success: false,
+        status: 500,
+        message: 'Error: ${e.toString()}',
+      );
+    }
+  }
+
+  // Check-out a student
+  Future<legacy.CheckInModel> checkOutStudent({
+    required String studentId,
+    required String attendanceId,
+    String deviceType = 'MANUAL',
+    String? deviceIdentifier,
+    String? notes,
+    String? checkTime,
+  }) async {
+    try {
+      var connectivityResult = await Connectivity().checkConnectivity();
+      bool hasInternet = connectivityResult != ConnectivityResult.none;
+
+      if (!hasInternet) {
+        return legacy.CheckInModel(
+          success: false,
+          status: 503,
+          message: 'Check-out requires internet connection',
+        );
+      }
+
+      SharedPreferences sharedPreferences =
+          await SharedPreferences.getInstance();
+      String? token = sharedPreferences.getString("token");
+
+      Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': '${token.toString()}}',
+      };
+
+      // Build query parameters
+      final queryParams = <String, String>{
+        'deviceType': deviceType,
+      };
+      if (deviceIdentifier != null && deviceIdentifier.isNotEmpty) {
+        queryParams['deviceIdentifier'] = deviceIdentifier;
+      }
+      if (notes != null && notes.isNotEmpty) {
+        queryParams['notes'] = notes;
+      }
+      if (checkTime != null && checkTime.isNotEmpty) {
+        queryParams['checkTime'] = checkTime;
+      }
+
+      final uri = Uri.parse(
+        '${dotenv.get('mainUrl')}/api/attendance/check-out/$attendanceId/student/$studentId'
+      ).replace(queryParameters: queryParams);
+      
+      print('=== POST Check-Out Request ===');
+      print('URL: $uri');
+      print('Headers: $headers');
+      print('Query Params: $queryParams');
+
+      var response = await http.post(uri, headers: headers);
+
+      print('Response Status: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+      print('==============================');
+      
+      Map<String, dynamic> results = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return legacy.CheckInModel.fromJson(results);
+      } else {
+        return legacy.CheckInModel(
+          success: false,
+          status: response.statusCode,
+          message: results['message'] ?? 'Failed to check out',
         );
       }
     } catch (e) {
@@ -254,11 +372,24 @@ class AttendanceService {
         'Authorization': token,
       };
       
+      final url = '${dotenv.get('mainUrl')}/api/attendance/sync';
+      final requestBody = syncRequest.toJson();
+      
+      print('=== POST Sync Attendance Request ===');
+      print('URL: $url');
+      print('Headers: $headers');
+      print('Body: ${json.encode(requestBody)}');
+      print('Syncing ${attendanceRecords.length} records for classroom: $classroomId');
+      
       var response = await http.post(
-        Uri.parse('${dotenv.get('mainUrl')}/api/attendance/sync'),
+        Uri.parse(url),
         headers: headers,
-        body: json.encode(syncRequest.toJson()),
+        body: json.encode(requestBody),
       );
+      
+      print('Response Status: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+      print('====================================');
       
       if (response.statusCode == 200 || response.statusCode == 201) {
         // Clear the successfully synced records from storage

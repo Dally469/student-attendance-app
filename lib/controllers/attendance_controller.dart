@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:attendance/api/auth.service.dart';
 import 'package:attendance/api/attendance.service.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/attendance.dart';
 import '../models/check_in.dart';
 
@@ -27,7 +29,12 @@ class AttendanceController extends GetxController {
   final RxInt checkInCount = RxInt(0);
 
   // Function to create attendance
-  Future<void> createAttendance(String classroomId) async {
+  Future<void> createAttendance(
+    String classroomId, {
+    String mode = 'CHECK_IN_ONLY',
+    String deviceType = 'FACE',
+    String? schoolId,
+  }) async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
@@ -37,7 +44,37 @@ class AttendanceController extends GetxController {
       currentAttendance.value = null;
       attendanceId.value = '';
       
-      final result = await _authService.createAttendance(classroomId);
+      // Get schoolId from SharedPreferences if not provided
+      String? finalSchoolId = schoolId;
+      if (finalSchoolId == null) {
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        String? schoolJson = prefs.getString('currentSchool');
+        if (schoolJson != null && schoolJson != 'no') {
+          try {
+            Map<String, dynamic> schoolMap = jsonDecode(schoolJson);
+            finalSchoolId = schoolMap['id'];
+          } catch (e) {
+            print('Error parsing school JSON: $e');
+          }
+        }
+      }
+      
+      // If we still don't have a schoolId, show error
+      if (finalSchoolId == null || finalSchoolId.isEmpty) {
+        errorMessage.value = 'School ID not found. Please login again.';
+        return;
+      }
+      
+      // Log parameters for debugging
+      print('Creating attendance - ClassroomID: $classroomId, Mode: $mode, DeviceType: $deviceType, SchoolID: $finalSchoolId');
+      
+      // Call API
+      final result = await _authService.createAttendance(
+        classroomId,
+        mode: mode,
+        deviceType: deviceType,
+        schoolId: finalSchoolId,
+      );
       
       // Log result for debugging
       print('API Response: $result');
@@ -88,8 +125,16 @@ class AttendanceController extends GetxController {
     }
   }
   
-  // Function to check in a student using their card
-  Future<void> checkInStudent({required String studentId, required String classroomId, required String attendanceId}) async {
+  // Function to check in a student
+  Future<void> checkInStudent({
+    required String studentId,
+    required String classroomId,
+    required String attendanceId,
+    String deviceType = 'MANUAL',
+    String? deviceIdentifier,
+    String? notes,
+    String? checkTime,
+  }) async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
@@ -100,8 +145,17 @@ class AttendanceController extends GetxController {
       
       // Log the parameters for debugging
       print('Check-in attempt - StudentID: $studentId, ClassroomID: $classroomId, AttendanceID: $attendanceId');
+      print('DeviceType: $deviceType, DeviceIdentifier: $deviceIdentifier');
       
-      final result = await _attendanceService.checkInStudent(studentId, classroomId, attendanceId);
+      final result = await _attendanceService.checkInStudent(
+        studentId,
+        classroomId,
+        attendanceId,
+        deviceType: deviceType,
+        deviceIdentifier: deviceIdentifier,
+        notes: notes,
+        checkTime: checkTime,
+      );
       
       // Log the result for debugging
       print('Check-in API Response: $result');
@@ -122,6 +176,7 @@ class AttendanceController extends GetxController {
         // Just log success and update observables, don't directly update UI
         print('Student check-in successful: ${successMessage.value}');
         lastCheckedInStudent.value = studentId; // Update this observable for UI to react
+        checkInCount.value++; // Increment check-in count
       } else {
         // Handle error case
         errorMessage.value = result.message ?? 'Failed to check in student';
@@ -135,6 +190,84 @@ class AttendanceController extends GetxController {
       
       // Just log error, don't try to show UI
       print('Error during student check-in: ${errorMessage.value}');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Function to check out a student
+  Future<void> checkOutStudent({
+    required String studentId,
+    required String attendanceId,
+    String deviceType = 'MANUAL',
+    String? deviceIdentifier,
+    String? notes,
+    String? checkTime,
+  }) async {
+    try {
+      isLoading.value = true;
+      errorMessage.value = '';
+      successMessage.value = '';
+      
+      // Log the parameters for debugging
+      print('Check-out attempt - StudentID: $studentId, AttendanceID: $attendanceId');
+      print('DeviceType: $deviceType, DeviceIdentifier: $deviceIdentifier');
+      
+      final result = await _attendanceService.checkOutStudent(
+        studentId: studentId,
+        attendanceId: attendanceId,
+        deviceType: deviceType,
+        deviceIdentifier: deviceIdentifier,
+        notes: notes,
+        checkTime: checkTime,
+      );
+      
+      // Log the result for debugging
+      print('Check-out API Response: $result');
+      if (result.data != null) {
+        print('Check-out data: ${result.data.toString()}');
+      }
+      
+      if (result.success == true) {
+        // Store the check-out result - Convert CheckInModel to CheckInModel
+        checkInModel.value = CheckInModel(
+          statusCode: result.status,
+          success: result.success,
+          message: result.message,
+          data: result.data != null ? CheckInData(
+            id: result.data?.id,
+            studentId: result.data?.studentId,
+            studentName: result.data?.studentName,
+            checkInTime: result.data?.checkInTime,
+            checkOutTime: result.data?.checkOutTime,
+            status: result.data?.status,
+            attendanceId: result.data?.attendanceId,
+            deviceType: result.data?.deviceType,
+            deviceIdentifier: result.data?.deviceIdentifier,
+          ) : null,
+        );
+        
+        // Set success message from API or use default
+        successMessage.value = result.message;
+        
+        // Add a short delay to ensure reactive state is updated
+        await Future.delayed(const Duration(milliseconds: 300));
+        
+        // Just log success and update observables, don't directly update UI
+        print('Student check-out successful: ${successMessage.value}');
+      } else {
+        // Handle error case
+        errorMessage.value = result.message;
+        
+        // Just log error and update observables, don't directly update UI
+        print('Student check-out failed: ${errorMessage.value}');
+      }
+    } catch (e) {
+      print('Exception in checkOutStudent: $e');
+      errorMessage.value = 'An error occurred during check-out: $e';
+      
+      // Just log error, don't try to show UI
+      print('Error during student check-out: ${errorMessage.value}');
     } finally {
       isLoading.value = false;
     }

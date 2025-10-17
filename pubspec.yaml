@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.0.0+3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -50,6 +50,14 @@ dependencies:
   device_info_plus: ^4.0.0
   path_provider: ^2.0.15
   intl: ^0.18.1
+  firebase_core: any
+  firebase_storage: any
+  image_picker: ^1.0.7
+  file_picker: any
+  google_mlkit_face_detection: ^0.13.0
+  tflite_flutter: ^0.10.4
+  image: ^4.2.0
+  camera: ^0.10.5
 
 
 dev_dependencies:
@@ -80,4 +88,6 @@ flutter:
     - assets/translations/
     - assets/flags/
     - assets/countries/
+    - assets/icons/
+    - assets/models/mobilefacenet.tflite
     - .env

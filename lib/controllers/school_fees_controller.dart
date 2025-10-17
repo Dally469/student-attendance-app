@@ -15,6 +15,7 @@ import '../models/classroom.fee.history.dart';
 import '../models/classroom.model.dart';
 import '../models/student.model.dart';
 import '../routes/routes.names.dart' as routes;
+import '../routes/routes.names.dart';
 import '../utils/notifiers.dart';
 
 class SchoolFeesController extends GetxController {
@@ -39,7 +40,7 @@ class SchoolFeesController extends GetxController {
     'Term 3',
   ].obs;
 
-  RxList<Classroom> classrooms = <Classroom>[].obs;
+  RxList<Classrooms> classrooms = <Classrooms>[].obs;
   Timer? _debounce; // Debounce timer for search
 
   @override
@@ -75,9 +76,9 @@ class SchoolFeesController extends GetxController {
       errorMessage.value = '';
 
       final result = await _classroomService.fetchSchoolClassrooms();
-      debugPrint("Classrooms: ${result.data!.length}");
+      debugPrint("Classrooms: ${result.data?.classrooms?.length}");
       if (result.success == true && result.data != null) {
-        classrooms.assignAll(result.data!);
+        classrooms.assignAll(result.data!.classrooms!);
       } else {
         errorMessage.value = result.message ?? 'Failed to fetch classrooms';
       }
@@ -590,6 +591,7 @@ class SchoolFeesController extends GetxController {
         await fetchSchoolFeeHistory();
         // Get.back();
         Navigator.pop(Get.context!);
+          Get.toNamed(home);
       }
       // feeHistory.add(payment);
     } catch (e) {

@@ -8,6 +8,7 @@ import 'package:attendance/controllers/school_classroom_controller.dart';
 import 'package:attendance/controllers/user_login_controller.dart';
 import 'package:attendance/screens/splash.screen.dart';
 import 'package:attendance/utils/colors.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,10 +16,14 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'api/facial.service.dart';
 import 'controllers/parent_communication_controller.dart';
 import 'controllers/school_fees_controller.dart';
+import 'controllers/sms.controller.dart';
 import 'routes/routes.names.dart'; // Route names
 import 'routes/routes.provider.dart'; // Updated routes provider for GetX
+
+
 
 Future<void> main() async {
   // Load environment variables based on build mode
@@ -27,7 +32,15 @@ Future<void> main() async {
   }
 
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+   
+  } catch (e) {
+    print('Firebase initialization error: $e');
+  }
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+  
 
   final prefs = await SharedPreferences.getInstance();
   final showHome = prefs.getBool('showHome') ?? false;
@@ -43,6 +56,12 @@ Future<void> main() async {
 
   // Initialize GetX controllers
   _initializeGetXControllers();
+
+  try {
+    await Get.find<FacialService>().initModel();
+  } catch (e) {
+    print('Failed to initialize FacialService: $e');
+  }
 
   runApp(MyApp(showHome: showHome));
 }
@@ -82,7 +101,9 @@ void _initializeGetXControllers() {
   Get.put(AttendanceController(), permanent: true);
   Get.put(ParentCommunicationController(), permanent: true);
   Get.put(SchoolFeesController(), permanent: true);
-}
+  Get.put(SMSController(), permanent: true);
+  Get.put(FacialService(), permanent: true);
+  }
 
 class MyHttpOverrides extends HttpOverrides {
   @override

@@ -2,7 +2,7 @@ class SchoolClassroomModel {
   int? status;
   bool? success;
   String? message;
-  List<Classroom>? data;
+  Data? data;
 
   SchoolClassroomModel({this.status, this.success, this.message, this.data});
 
@@ -10,12 +10,7 @@ class SchoolClassroomModel {
     status = json['status'];
     success = json['success'];
     message = json['message'];
-    if (json['data'] != null) {
-      data = <Classroom>[];
-      json['data'].forEach((v) {
-        data!.add(Classroom.fromJson(v));
-      });
-    }
+    data = json['data'] != null ? Data.fromJson(json['data']) : null;
   }
 
   Map<String, dynamic> toJson() {
@@ -24,74 +19,99 @@ class SchoolClassroomModel {
     data['success'] = success;
     data['message'] = message;
     if (this.data != null) {
-      data['data'] = this.data!.map((v) => v.toJson()).toList();
+      data['data'] = this.data!.toJson();
     }
     return data;
   }
 }
 
-class Classroom {
-  String? id;
-  School? school;
-  String? name;
+class Data {
+  int? totalItems;
+  int? size;
+  int? totalPages;
+  List<Classrooms>? classrooms;
+  int? currentPage;
 
-  Classroom({this.id, this.school, this.name});
+  Data(
+      {this.totalItems,
+      this.size,
+      this.totalPages,
+      this.classrooms,
+      this.currentPage});
 
-  Classroom.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    school =
-        json['school'] != null ? School.fromJson(json['school']) : null;
-    name = json['name'];
+  Data.fromJson(Map<String, dynamic> json) {
+    totalItems = json['totalItems'];
+    size = json['size'];
+    totalPages = json['totalPages'];
+    if (json['classrooms'] != null) {
+      classrooms = <Classrooms>[];
+      json['classrooms'].forEach((v) {
+        classrooms!.add(Classrooms.fromJson(v));
+      });
+    }
+    currentPage = json['currentPage'];
   }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
-    data['id'] = id;
-    if (school != null) {
-      data['school'] = school!.toJson();
+    data['totalItems'] = totalItems;
+    data['size'] = size;
+    data['totalPages'] = totalPages;
+    if (classrooms != null) {
+      data['classrooms'] = classrooms!.map((v) => v.toJson()).toList();
     }
-    data['name'] = name;
+    data['currentPage'] = currentPage;
     return data;
   }
 }
 
-class School {
-  String? id;
+class Classrooms {
   String? name;
-  String? phone;
-  String? email;
-  String? logo;
-  String? status;
-  String? slogan;
+  String? id;
+  Null? department;
+  Statistics? statistics;
 
-  School(
-      {this.id,
-      this.name,
-      this.phone,
-      this.email,
-      this.logo,
-      this.status,
-      this.slogan});
+  Classrooms({this.name, this.id, this.department, this.statistics});
 
-  School.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
+  Classrooms.fromJson(Map<String, dynamic> json) {
     name = json['name'];
-    phone = json['phone'];
-    email = json['email'];
-    logo = json['logo'];
-    status = json['status'];
-    slogan = json['slogan'];
+    id = json['id'];
+    department = json['department'];
+    statistics = json['statistics'] != null
+        ? Statistics.fromJson(json['statistics'])
+        : null;
   }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
-    data['id'] = id;
     data['name'] = name;
-    data['phone'] = phone;
-    data['email'] = email;
-    data['logo'] = logo;
-    data['status'] = status;
-    data['slogan'] = slogan;
+    data['id'] = id;
+    data['department'] = department;
+    if (statistics != null) {
+      data['statistics'] = statistics!.toJson();
+    }
+    return data;
+  }
+}
+
+class Statistics {
+  int? maleCount;
+  int? totalStudents;
+  int? femaleCount;
+
+  Statistics({this.maleCount, this.totalStudents, this.femaleCount});
+
+  Statistics.fromJson(Map<String, dynamic> json) {
+    maleCount = json['maleCount'];
+    totalStudents = json['totalStudents'];
+    femaleCount = json['femaleCount'];
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['maleCount'] = maleCount;
+    data['totalStudents'] = totalStudents;
+    data['femaleCount'] = femaleCount;
     return data;
   }
 }

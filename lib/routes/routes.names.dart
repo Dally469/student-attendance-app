@@ -21,5 +21,11 @@ String communication = '/communication';
 String fees = '/forgotPassword';
 String card = '/signup';
 String feeHistory = '/feeHistory';
+String schoolsRoute = '/schools';
+String smsHistory = '/smsHistory';
+String assignFacialData = '/assignFacialData';
+
+
+
 
 

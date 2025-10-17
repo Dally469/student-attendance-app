@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'package:attendance/controllers/attendance_controller.dart';
 import 'package:attendance/controllers/school_classroom_controller.dart';
 import 'package:attendance/controllers/school_fees_controller.dart';
+import 'package:attendance/controllers/sms.controller.dart';
 import 'package:attendance/models/classroom.model.dart';
 import 'package:attendance/models/school.fee.type.dart';
 import 'package:attendance/models/student.model.dart';
 import 'package:attendance/routes/routes.names.dart';
-import 'package:attendance/routes/routes.provider.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -17,7 +17,6 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:go_router/go_router.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -38,6 +37,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
       Get.find<AttendanceController>();
   final SchoolFeesController _schoolFeesController =
       Get.find<SchoolFeesController>();
+  final SMSController _smsController = Get.find<SMSController>();
 
   @override
   void initState() {
@@ -52,26 +52,90 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
           await SharedPreferences.getInstance();
       String? userJson = sharedPreferences.getString("currentUser");
       String? schoolJson = sharedPreferences.getString("currentSchool");
-      if (userJson != null) {
+
+      debugPrint("User JSON: $userJson");
+      debugPrint("School JSON: $schoolJson");
+
+      if (userJson != null && userJson != 'no') {
         Map<String, dynamic> userMap = jsonDecode(userJson);
-        Map<String, dynamic> schoolMap = jsonDecode(schoolJson!);
+
         setState(() {
+          // Set user full names
           userFullNames =
               '${userMap['firstName'] ?? '---'} ${userMap['lastName'] ?? '---'}';
-          if (kDebugMode) {
-            print(schoolMap['name']);
+        });
+
+        // Handle school information - check multiple sources
+        Map<String, dynamic>? schoolMap;
+
+        // First, try to get school info from separate schoolJson
+        if (schoolJson != null && schoolJson != 'no' && schoolJson.isNotEmpty) {
+          try {
+            schoolMap = jsonDecode(schoolJson);
+            debugPrint("School info found in separate storage");
+          } catch (e) {
+            debugPrint("Error parsing school JSON: $e");
+            schoolMap = null;
           }
-          if (userMap.containsKey('school') && userMap['school'] != null) {
-            schoolName = userMap['school']['name'];
-            schoolLogo = userMap['school']['logo'];
-            schoolId = userMap['school']['id'];
+        }
+
+        // If no separate school info, check if it's embedded in user data
+        if (schoolMap == null &&
+            userMap.containsKey('school') &&
+            userMap['school'] != null) {
+          schoolMap = userMap['school'] as Map<String, dynamic>;
+          debugPrint("School info found in user data");
+        }
+
+        // Update state with school information
+        setState(() {
+          if (schoolMap != null) {
+            schoolName = schoolMap['name'] ?? 'Unknown School';
+            schoolLogo = schoolMap['logo'];
+            schoolId = schoolMap['id'];
+            _smsController.schoolId = schoolMap['id'];
+
+            if (kDebugMode) {
+              print("School Name: ${schoolMap['name']}");
+            }
+          } else {
+            debugPrint("No school information found");
+            schoolName = 'No School Assigned';
+            schoolLogo = null;
+            schoolId = null;
           }
         });
+
         debugPrint("School ID: $schoolId");
-        _schoolFeesController.fetchFeeTypes(schoolId!);
+        debugPrint("School Name: $schoolName");
+
+        // Only call these functions if schoolId is available
+        if (schoolId != null) {
+          _schoolFeesController.fetchFeeTypes(schoolId!);
+          _smsController.getSMSBalance();
+        } else {
+          debugPrint(
+              "Warning: School ID is null, skipping fee types and SMS balance fetch");
+        }
+      } else {
+        debugPrint("No user data found in SharedPreferences");
+        setState(() {
+          userFullNames = '--- ---';
+          schoolName = 'No School';
+          schoolLogo = null;
+          schoolId = null;
+        });
       }
     } catch (e) {
       debugPrint('Error getting user info: $e');
+
+      // Set default values in case of error
+      setState(() {
+        userFullNames = 'Error Loading User';
+        schoolName = 'Error Loading School';
+        schoolLogo = null;
+        schoolId = null;
+      });
     }
   }
 
@@ -137,19 +201,20 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
               Get.toNamed(myRequests);
             },
           ),
-          Divider(
-              color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.3)),
-          ListTile(
-            leading: Icon(Icons.settings,
-                color: Theme.of(context).colorScheme.onPrimary,
-                semanticLabel: 'Settings'),
-            title: Text('Settings',
-                style: TextStyle(
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    fontWeight: FontWeight.w300,
-                    fontSize: 16)),
-            onTap: () => Navigator.pop(context),
-          ),
+          // ListTile(
+          //   leading: Icon(Icons.school,
+          //       color: Theme.of(context).colorScheme.onPrimary,
+          //       semanticLabel: 'School'),
+          //   title: Text('Schools',
+          //       style: TextStyle(
+          //           color: Theme.of(context).colorScheme.onPrimary,
+          //           fontWeight: FontWeight.w300,
+          //           fontSize: 16)),
+          //   onTap: () {
+          //     Navigator.pop(context);
+          //     Get.toNamed(schools);
+          //   },
+          // ),
           const Spacer(),
           Divider(
               color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.3)),
@@ -328,7 +393,296 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
     );
   }
 
-  void _handleClassroomSelection(Classroom classroomData,
+  void _showAttendanceConfigDialog(
+      BuildContext context, Classrooms classroomData) {
+    String selectedMode = 'CHECK_IN_ONLY';
+    String selectedDeviceType = 'FACE';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.settings,
+                  color: primaryColor, size: 24, semanticLabel: 'Settings icon'),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Attendance Configuration',
+                  style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w700, fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Configure attendance settings for "${classroomData.name ?? 'Unknown'}"',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onSurface),
+                ),
+                const SizedBox(height: 20),
+                // Device Type Selection
+                Text(
+                  'Device Type',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outline
+                            .withOpacity(0.3)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      RadioListTile<String>(
+                        title: Row(
+                          children: [
+                            Icon(Icons.face,
+                                color: primaryColor,
+                                size: 20,
+                                semanticLabel: 'Face recognition'),
+                            const SizedBox(width: 8),
+                            Text('Face Recognition',
+                                style: GoogleFonts.poppins(fontSize: 14)),
+                          ],
+                        ),
+                        value: 'FACE',
+                        groupValue: selectedDeviceType,
+                        activeColor: primaryColor,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedDeviceType = value!;
+                          });
+                        },
+                      ),
+                      Divider(
+                          height: 1,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withOpacity(0.2)),
+                      RadioListTile<String>(
+                        title: Row(
+                          children: [
+                            Icon(Icons.credit_card,
+                                color: orangeColor,
+                                size: 20,
+                                semanticLabel: 'RFID card'),
+                            const SizedBox(width: 8),
+                            Text('RFID Card',
+                                style: GoogleFonts.poppins(fontSize: 14)),
+                          ],
+                        ),
+                        value: 'CARD',
+                        groupValue: selectedDeviceType,
+                        activeColor: primaryColor,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedDeviceType = value!;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Mode Selection
+                Text(
+                  'Attendance Mode',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outline
+                            .withOpacity(0.3)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      RadioListTile<String>(
+                        title: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Check In Only',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 14, fontWeight: FontWeight.w500)),
+                            Text('Students can only check in',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withOpacity(0.6))),
+                          ],
+                        ),
+                        value: 'CHECK_IN_ONLY',
+                        groupValue: selectedMode,
+                        activeColor: primaryColor,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedMode = value!;
+                          });
+                        },
+                      ),
+                      Divider(
+                          height: 1,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withOpacity(0.2)),
+                      RadioListTile<String>(
+                        title: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Check In / Check Out',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 14, fontWeight: FontWeight.w500)),
+                            Text('Students can check in and check out',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withOpacity(0.6))),
+                          ],
+                        ),
+                        value: 'CHECK_IN_OUT',
+                        groupValue: selectedMode,
+                        activeColor: primaryColor,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedMode = value!;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('Cancel',
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _createAttendanceWithConfig(
+                  classroomData,
+                  selectedMode,
+                  selectedDeviceType,
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                elevation: 2,
+                shadowColor: primaryColor.withOpacity(0.3),
+              ),
+              child: Text('Create Attendance',
+                  style: GoogleFonts.poppins(fontSize: 14)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _createAttendanceWithConfig(
+      Classrooms classroomData, String mode, String deviceType) {
+    if (schoolId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('School ID not found. Please login again.'),
+            backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    isCreatingAttendance.value = true;
+    _attendanceController.createAttendance(
+      classroomData.id.toString(),
+      mode: mode,
+      deviceType: deviceType,
+      schoolId: schoolId!,
+    );
+
+    late StreamSubscription successSubscription;
+    successSubscription = _attendanceController.successMessage.listen((message) {
+      if (message.isNotEmpty) {
+        Future.delayed(const Duration(milliseconds: 300), () {
+          String attendanceId =
+              _attendanceController.currentAttendance.value?.data?.id ??
+                  _attendanceController.attendanceId.value;
+          isCreatingAttendance.value = false;
+          successSubscription.cancel();
+          if (attendanceId.isNotEmpty && context.mounted) {
+            Get.toNamed(makeAttendance, parameters: {
+              'classroomId': classroomData.id.toString(),
+              'classroom': classroomData.name.toString(),
+              'attendanceId': attendanceId,
+            });
+          } else if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content:
+                      Text('Failed to get attendance ID. Please try again.'),
+                  backgroundColor: Colors.red),
+            );
+          }
+        });
+      }
+    });
+
+    late StreamSubscription errorSubscription;
+    errorSubscription =
+        _attendanceController.errorMessage.listen((errorMessage) {
+      if (errorMessage.isNotEmpty) {
+        Future.delayed(const Duration(milliseconds: 300), () {
+          isCreatingAttendance.value = false;
+          errorSubscription.cancel();
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+            );
+          }
+        });
+      }
+    });
+  }
+
+  void _handleClassroomSelection(Classrooms classroomData,
       {FeesData? selectedFeeType}) {
     if (selectedService.value == 'fees' && selectedFeeType != null) {
       showDialog(
@@ -421,58 +775,22 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
           });
           break;
         case 'attendance':
-          isCreatingAttendance.value = true;
-          _attendanceController.createAttendance(classroomData.id.toString());
-          late StreamSubscription successSubscription;
-          successSubscription =
-              _attendanceController.successMessage.listen((message) {
-            if (message.isNotEmpty) {
-              Future.delayed(const Duration(milliseconds: 300), () {
-                String attendanceId =
-                    _attendanceController.currentAttendance.value?.data?.id ??
-                        _attendanceController.attendanceId.value;
-                isCreatingAttendance.value = false;
-                successSubscription.cancel();
-                if (attendanceId.isNotEmpty && context.mounted) {
-                  Get.toNamed(makeAttendance, parameters: {
-                    'classroomId': classroomData.id.toString(),
-                    'classroom': classroomData.name.toString(),
-                    'attendanceId': attendanceId,
-                  });
-                } else if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text(
-                            'Failed to get attendance ID. Please try again.'),
-                        backgroundColor: Colors.red),
-                  );
-                }
-              });
-            }
-          });
-          late StreamSubscription errorSubscription;
-          errorSubscription =
-              _attendanceController.errorMessage.listen((errorMessage) {
-            if (errorMessage.isNotEmpty) {
-              Future.delayed(const Duration(milliseconds: 300), () {
-                isCreatingAttendance.value = false;
-                errorSubscription.cancel();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text(errorMessage),
-                        backgroundColor: Colors.red),
-                  );
-                }
-              });
-            }
-          });
+          _showAttendanceConfigDialog(context, classroomData);
           break;
         case 'communication':
           Get.toNamed(parentCommunication, parameters: {
             'classroom': classroomData.name.toString(),
             'classroomId': classroomData.id.toString(),
           });
+          break;
+        case 'facial':
+          Get.toNamed(assignFacialData, parameters: {
+            'classroom': classroomData.name.toString(),
+            'classroomId': classroomData.id.toString(),
+          });
+          break;
+        case 'sms':
+          Get.toNamed('/sms-topup'); // Add this route to your routes
           break;
         case 'fees':
           // Handled in the dialog above
@@ -631,7 +949,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _applyFeeToClass(Classroom classroom, FeesData feeType) async {
+  Future<void> _applyFeeToClass(Classrooms classroom, FeesData feeType) async {
     try {
       await _schoolFeesController.applyFee(
         classroomId: classroom.id.toString(),
@@ -770,6 +1088,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                 onTap: () {
                   HapticFeedback.lightImpact();
                   selectedService.value = service;
+
                   if (service == 'fees') {
                     showModalBottomSheet(
                       context: context,
@@ -777,6 +1096,8 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                       backgroundColor: Colors.transparent,
                       builder: (context) => _buildFeeTypesBottomSheet(),
                     );
+                  } else if (service == 'sms') {
+                    debugPrint('SMS');
                   } else {
                     _showClassroomBottomSheet(context);
                     _schoolClassroomController.getSchoolClassrooms();
@@ -863,7 +1184,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                               child: GestureDetector(
                                 onTap: () {
                                   HapticFeedback.lightImpact();
-                                  Get.toNamed(historyRoute);
+                                  Get.toNamed(smsHistory);
                                 },
                                 child: Text(
                                   'Show',
@@ -1215,6 +1536,11 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
         return 'Communicate with parents or students';
       case 'fees':
         return 'Manage school fees for students';
+      case 'sms':
+        return 'Manage SMS credits and view balance';
+
+      case 'facial':
+        return 'Manage facial recognition for students';
       default:
         return '';
     }
@@ -1359,6 +1685,9 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                   _buildServiceCard(
                       'Assign Student Card', 'assets/images/nfc.png', 'card'),
                   const SizedBox(height: 16),
+                  _buildServiceCard('Assign Facial Recognition',
+                      'assets/images/nfc.png', 'facial'),
+                  const SizedBox(height: 16),
                   _buildServiceCard('Record Attendance',
                       'assets/images/attendance.png', 'attendance'),
                   const SizedBox(height: 16),
@@ -1368,6 +1697,10 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                   _buildServiceCard('Manage School Fees',
                       'assets/images/tuition-fees.png', 'fees',
                       hasHistory: true, historyRoute: feeHistory),
+                  const SizedBox(height: 16),
+                  _buildServiceCard(
+                      'SMS Top-up & Balance', 'assets/images/sms.png', 'sms',
+                      hasHistory: true, historyRoute: smsHistory),
                 ],
               ),
             ),
@@ -1381,7 +1714,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
 class _ClassroomBottomSheet extends StatefulWidget {
   final RxString selectedService;
   final SchoolClassroomController schoolClassroomController;
-  final void Function(Classroom) onClassroomSelected;
+  final void Function(Classrooms) onClassroomSelected;
 
   const _ClassroomBottomSheet({
     required this.selectedService,
@@ -1513,7 +1846,7 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
     );
   }
 
-  Widget _buildClassroomCard(Classroom classroom, String service) {
+  Widget _buildClassroomCard(Classrooms classroom, String service) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: InkWell(
@@ -1617,6 +1950,8 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
         return 'Select a Class for Parent Communication';
       case 'fees':
         return 'Select a Class to Manage Fees';
+      case 'facial':
+        return 'Select a Class to Assign Facial Data';
       default:
         return 'Select a Class';
     }
@@ -1722,7 +2057,8 @@ class SingleStudentBottomSheet extends StatefulWidget {
   final RxString selectedService;
   final SchoolClassroomController schoolClassroomController;
   final FeesData? selectedFeeType;
-  final void Function(StudentData, {FeesData? selectedFeeType}) onStudentSelected;
+  final void Function(StudentData, {FeesData? selectedFeeType})
+      onStudentSelected;
 
   const SingleStudentBottomSheet({
     Key? key,
@@ -1733,15 +2069,18 @@ class SingleStudentBottomSheet extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _SingleStudentBottomSheetState createState() => _SingleStudentBottomSheetState();
+  _SingleStudentBottomSheetState createState() =>
+      _SingleStudentBottomSheetState();
 }
 
-class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet> with SingleTickerProviderStateMixin {
+class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   final TextEditingController _searchController = TextEditingController();
-  final SchoolFeesController _schoolFeesController = Get.find<SchoolFeesController>();
+  final SchoolFeesController _schoolFeesController =
+      Get.find<SchoolFeesController>();
   Timer? _debounce;
 
   @override
@@ -1802,7 +2141,8 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet> wit
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
                   blurRadius: 15,
                   spreadRadius: 5,
                   offset: const Offset(0, -3),
@@ -1815,7 +2155,8 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet> wit
                 _buildHeader(context),
                 _buildSearchField(context),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 8.0),
                   child: Obx(() => Text(
                         'Total Results: ${_schoolFeesController.students.length}',
                         style: GoogleFonts.poppins(
@@ -1847,10 +2188,12 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet> wit
                         ).animate(
                           CurvedAnimation(
                             parent: _animationController,
-                            curve: Interval(index * 0.1, 1.0, curve: Curves.easeOut),
+                            curve: Interval(index * 0.1, 1.0,
+                                curve: Curves.easeOut),
                           ),
                         ),
-                        child: _buildStudentCard(context, _schoolFeesController.students[index]),
+                        child: _buildStudentCard(
+                            context, _schoolFeesController.students[index]),
                       ),
                     );
                   }),
@@ -1937,10 +2280,13 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet> wit
             color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w400,
           ),
-          prefixIcon: Icon(Icons.search, color: primaryColor, semanticLabel: 'Search'),
-          suffixIcon:   _searchController.text.isNotEmpty
+          prefixIcon:
+              Icon(Icons.search, color: primaryColor, semanticLabel: 'Search'),
+          suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.clear, color: Theme.of(context).colorScheme.onSurfaceVariant, semanticLabel: 'Clear search'),
+                  icon: Icon(Icons.clear,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      semanticLabel: 'Clear search'),
                   onPressed: () {
                     _searchController.clear();
                     _schoolFeesController.students.clear();
@@ -1953,8 +2299,10 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet> wit
             borderSide: BorderSide.none,
           ),
           filled: true,
-          fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.1),
-          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          fillColor:
+              Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.1),
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         ),
         style: GoogleFonts.poppins(fontSize: 14),
         textInputAction: TextInputAction.search,
@@ -2067,7 +2415,8 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet> wit
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: InkWell(
-        onTap: () => widget.onStudentSelected(student, selectedFeeType: widget.selectedFeeType),
+        onTap: () => widget.onStudentSelected(student,
+            selectedFeeType: widget.selectedFeeType),
         borderRadius: BorderRadius.circular(12),
         splashColor: primaryColor.withOpacity(0.3),
         highlightColor: primaryColor.withOpacity(0.1),
@@ -2083,7 +2432,8 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet> wit
             ),
             boxShadow: [
               BoxShadow(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
+                color:
+                    Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -2103,7 +2453,8 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet> wit
                       fontWeight: FontWeight.bold,
                       color: primaryColor,
                     ),
-                    semanticsLabel: 'Student ${student.name ?? 'Unknown'} initial',
+                    semanticsLabel:
+                        'Student ${student.name ?? 'Unknown'} initial',
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -2136,7 +2487,10 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet> wit
                           style: GoogleFonts.poppins(
                             fontSize: 13,
                             fontWeight: FontWeight.w400,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant
+                                .withOpacity(0.7),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2153,7 +2507,8 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet> wit
                     Icons.arrow_forward_ios,
                     size: 18,
                     color: primaryColor,
-                    semanticLabel: 'Select student ${student.name ?? 'Unknown'}',
+                    semanticLabel:
+                        'Select student ${student.name ?? 'Unknown'}',
                   ),
                 ),
               ],

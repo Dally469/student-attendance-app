@@ -12,6 +12,10 @@ import 'package:attendance/screens/splash.screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../screens/assign.facial.screen.dart';
+import '../screens/schools.dart';
+import '../screens/sms.screen.dart';
+
 class AppNavigation {
   AppNavigation._();
 
@@ -63,6 +67,16 @@ class AppNavigation {
       },
     ),
     GetPage(
+      name: assignFacialData,
+      page: () {
+        final params = Get.parameters;
+        return EnhancedAssignFacialData(
+          classroomId: params['classroomId'],
+          classroom: params['classroom'],
+        );
+      },
+    ),
+    GetPage(
       name: makeAttendance,
       page: () {
         final params = Get.parameters;
@@ -83,6 +97,12 @@ class AppNavigation {
       },
     ),
     GetPage(
+      name: smsHistory,
+      page: () {
+         return SMSTopUpScreen();
+      },
+    ),
+    GetPage(
       name: addCard,
       page: () {
         final params = Get.parameters;
@@ -94,6 +114,10 @@ class AppNavigation {
           profileImage: params['profileImage'],
         );
       },
+    ),
+    GetPage(
+      name: schoolsRoute,
+      page: () => SchoolManagement(),
     ),
   ];
 

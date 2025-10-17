@@ -33,6 +33,8 @@ class CheckInData {
   final String attendanceEndTime;
   final String status;
   final int attendedMinutes;
+  final String? deviceType;
+  final String? deviceIdentifier;
 
   CheckInData({
     required this.id,
@@ -46,6 +48,8 @@ class CheckInData {
     required this.attendanceEndTime,
     required this.status,
     required this.attendedMinutes,
+    this.deviceType,
+    this.deviceIdentifier,
   });
 
   factory CheckInData.fromJson(Map<String, dynamic> json) {
@@ -61,6 +65,8 @@ class CheckInData {
       attendanceEndTime: json['attendanceEndTime'] ?? '',
       status: json['status'] ?? '',
       attendedMinutes: json['attendedMinutes'] ?? 0,
+      deviceType: json['deviceType'],
+      deviceIdentifier: json['deviceIdentifier'],
     );
   }
 
@@ -77,6 +83,8 @@ class CheckInData {
       'attendanceEndTime': attendanceEndTime,
       'status': status,
       'attendedMinutes': attendedMinutes,
+      'deviceType': deviceType,
+      'deviceIdentifier': deviceIdentifier,
     };
   }
 }

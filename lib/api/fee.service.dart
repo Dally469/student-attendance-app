@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:attendance/models/fee.payment.dto.dart';
+import 'package:attendance/models/record.school.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -10,6 +11,7 @@ import 'package:attendance/controllers/school_fees_controller.dart';
 
 import '../models/classroom.fee.history.dart';
 import '../models/fee.assign.dto.dart';
+import '../models/school.model.dart';
 import '../models/student.model.dart';
 import '../utils/notifiers.dart'; // Import for StudentFeeDTO and FeePaymentDTO
 
@@ -42,6 +44,9 @@ class FeeService {
         final response = await http
             .get(Uri.parse(url), headers: headers)
             .timeout(Duration(seconds: _timeoutDuration));
+            debugPrint("URL: $url");
+            debugPrint("Headers: $headers");
+            debugPrint("Response: ${response.body}");
         return response;
       } catch (e) {
         attempt++;
@@ -61,12 +66,59 @@ class FeeService {
       try {
         final response = await http
             .post(Uri.parse(url), headers: headers, body: body)
-            .timeout(Duration(seconds: _timeoutDuration));
+            .timeout(const Duration(seconds: _timeoutDuration));
+            debugPrint("URL: $url");
+            debugPrint("Headers: $headers");
+            debugPrint("Body: $body");
+            debugPrint("Response: ${response.body}");
         return response;
       } catch (e) {
         attempt++;
         if (attempt == _maxRetries) {
           throw Exception('POST request failed after $_maxRetries attempts: $e');
+        }
+        await Future.delayed(Duration(milliseconds: 500 * (attempt * attempt)));
+      }
+    }
+    throw Exception('Unreachable code');
+  }
+  Future<http.Response> _putWithRetry(String url, Map<String, String> headers, String body) async {
+    int attempt = 0;
+    while (attempt < _maxRetries) {
+      try {
+        final response = await http
+            .put(Uri.parse(url), headers: headers, body: body)
+            .timeout(const Duration(seconds: _timeoutDuration));
+            debugPrint("URL: $url");
+            debugPrint("Headers: $headers");
+            debugPrint("Body: $body");
+            debugPrint("Response: ${response.body}");
+        return response;
+      } catch (e) {
+        attempt++;
+        if (attempt == _maxRetries) {
+          throw Exception('PUT request failed after $_maxRetries attempts: $e');
+        }
+        await Future.delayed(Duration(milliseconds: 500 * (attempt * attempt)));
+      }
+    }
+    throw Exception('Unreachable code');
+  }
+  Future<http.Response> _deleteWithRetry(String url, Map<String, String> headers) async {
+    int attempt = 0;
+    while (attempt < _maxRetries) {
+      try {
+        final response = await http
+            .delete(Uri.parse(url), headers: headers)
+            .timeout(const Duration(seconds: _timeoutDuration));
+              debugPrint("URL: $url");
+              debugPrint("Headers: $headers");
+              debugPrint("Response: ${response.body}");
+        return response;
+      } catch (e) {
+        attempt++;
+        if (attempt == _maxRetries) {
+          throw Exception('DELETE request failed after $_maxRetries attempts: $e');
         }
         await Future.delayed(Duration(milliseconds: 500 * (attempt * attempt)));
       }
@@ -157,44 +209,7 @@ class FeeService {
     }
   }
 
-  //     Future<List<ClassroomFeesData>> fetchSchoolFeeHistory(
-  //      {String? classroomId, String? academicYear, String? status, String? feeTypeId, String? term}) async {
-  //     try {
-  //     final sharedPreferences = await SharedPreferences.getInstance();
-  //     final token = sharedPreferences.getString("token") ?? "";
-  //     final headers = await _setHeaders(token);
-
-
-  //       final queryParams = <String, String>{};
-  //       if (classroomId != null) queryParams['classroomId'] = classroomId;
-  //       if (academicYear != null) queryParams['academicYear'] = academicYear;
-  //       if (status != null) queryParams['status'] = status;
-  //       if (feeTypeId != null) queryParams['feeTypeId'] = feeTypeId;
-  //       if (term != null) queryParams['term'] = term;
-
-  //      final response = await _getWithRetry(
-  //       '${dotenv.get('mainUrl')}/api/student-fees/school/fees$queryParams',
-  //       headers,
-  //     );
-  //     final results = jsonDecode(response.body);
-
-  //     if (response.statusCode == 200 && results['success'] == true) {
-  //       final feeHistory = (results['data'] as List?)?.map((item) => ClassroomFeesData.fromJson(item)).toList() ?? [];
-  //       return feeHistory;
-  //     } else if (response.statusCode == 404) {
-  //       // Handle no payment history case
-  //       debugPrint('No fee history found for classroomId');
-  //       return [];
-  //     } else {
-  //       final errorMessage = results['message'] ?? 'Failed to load fee history: ${response.statusCode}';
-  //       debugPrint('Error fetching fee history: $errorMessage, Response: ${response.body}');
-  //       throw Exception(errorMessage);
-  //     }
-  //   } catch (e) {
-  //     debugPrint('Error fetching fee history: $e');
-  //     throw Exception('Failed to fetch fee history: $e');
-  //   }
-  // }
+    
 
 
   Future<List<ClassroomFeesData>> fetchSchoolFeeHistory({
@@ -560,4 +575,132 @@ class FeeService {
       );
     }
   }
+
+
+    Future<List<SchoolData>> fetchSchools() async {
+      try {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final token = sharedPreferences.getString("token") ?? "";
+      final headers = await _setHeaders(token);
+
+       final response = await _getWithRetry(
+        '${dotenv.get('mainUrl')}/api/schools',
+        headers,
+      );
+      final results = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && results['success'] == true) {
+        final schools = (results['data'] as List?)?.map((item) => SchoolData.fromJson(item)).toList() ?? [];
+        return schools;
+      } else if (response.statusCode == 404) {
+        // Handle no payment history case
+        debugPrint('No school found');
+        return [];
+      } else {
+        final errorMessage = results['message'] ?? 'Failed to load school: ${response.statusCode}';
+        debugPrint('Error fetching school: $errorMessage, Response: ${response.body}');
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      debugPrint('Error fetching school: $e');
+      throw Exception('Failed to fetch school: $e');
+    }
+  }
+
+  Future<RecordSchoolModel> addSchool(SchoolData schoolData) async {
+    try {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final token = sharedPreferences.getString("token") ?? "";
+      final headers = await _setHeaders(token);
+
+      debugPrint(jsonEncode(schoolData));
+
+      final response = await _postWithRetry(
+        '${dotenv.get('mainUrl')}/api/schools',
+        headers,
+        jsonEncode({
+          'name': schoolData.name,
+          'phone': schoolData.phone,
+          'email': schoolData.email,
+          'logo': schoolData.logo,
+          'status': schoolData.status,
+          'slogan': schoolData.slogan,
+        }),
+      );
+
+      final results = jsonDecode(response.body);
+
+      if (response.statusCode == 201  && results['success'] == true) {
+        return RecordSchoolModel.fromJson(results);
+      } else {
+        throw Exception(results['message'] ?? 'Failed to add school: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error adding school: $e');
+      throw Exception('Failed to add school: $e');
+    }
+  }
+  Future<RecordSchoolModel> updateSchool(
+    {required String id,
+    String? name,
+    String? phone,
+    String? email,
+    String? logo,
+    String? status,
+    String? slogan}
+  ) async {
+    try {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final token = sharedPreferences.getString("token") ?? "";
+      final headers = await _setHeaders(token);
+
+      final response = await _putWithRetry(
+        '${dotenv.get('mainUrl')}/api/schools/$id',
+        headers,
+        jsonEncode({
+          'name': name,
+          'phone': phone,
+          'email': email,
+          'logo': logo,
+          'status': status,
+          'slogan': slogan,
+        }),
+      );
+
+      final results = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && results['success'] == true) {
+        return RecordSchoolModel.fromJson(results);
+      } else {
+        throw Exception(results['message'] ?? 'Failed to update school: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error updating school: $e');
+      throw Exception('Failed to update school: $e');
+    }
+  }
+  Future<RecordSchoolModel> deleteSchool(String id) async {
+    try {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final token = sharedPreferences.getString("token") ?? "";
+      final headers = await _setHeaders(token);
+
+      final response = await _deleteWithRetry(
+        '${dotenv.get('mainUrl')}/api/schools/$id',
+        headers,
+      );
+
+      final results = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && results['success'] == true) {
+        return RecordSchoolModel.fromJson(results);
+      } else {
+        throw Exception(results['message'] ?? 'Failed to delete school: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error deleting school: $e');
+      throw Exception('Failed to delete school: $e');
+    }
+  }
+
 }

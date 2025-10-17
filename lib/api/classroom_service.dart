@@ -24,13 +24,24 @@ class ClassroomService {
     int attempt = 0;
     while (attempt < _maxRetries) {
       try {
+        debugPrint('=== GET Request (Attempt ${attempt + 1}/$_maxRetries) ===');
+        debugPrint('URL: $url');
+        debugPrint('Headers: $headers');
+        
         final response = await http
             .get(Uri.parse(url), headers: headers)
             .timeout(Duration(seconds: _timeoutDuration));
+        
+        debugPrint('Response Status: ${response.statusCode}');
+        debugPrint('Response Body: ${response.body}');
+        debugPrint('========================================');
+        
         return response;
       } catch (e) {
         attempt++;
+        debugPrint('Request failed (Attempt $attempt/$_maxRetries): $e');
         if (attempt == _maxRetries) {
+          debugPrint('Max retries reached. Request failed.');
           rethrow;
         }
         await Future.delayed(Duration(milliseconds: 500 * attempt));
@@ -54,14 +65,14 @@ class ClassroomService {
       }
 
       final response = await _getWithRetry(
-        '${dotenv.get('mainUrl')}/api/classrooms',
+        '${dotenv.get('mainUrl')}/api/classrooms?page=0&size=50',
         headers,
       );
 
       final Map<String, dynamic> results = jsonDecode(response.body);
       debugPrint("Classrooms: ${results['data'].toString()}");
       final classroomModel = SchoolClassroomModel.fromJson(results);
-      debugPrint("Classroom Model: ${classroomModel.data!.length}");
+      debugPrint("Classroom Model: ${classroomModel.data?.classrooms?.length}");
 
       if (response.statusCode == 200 && classroomModel.success == true) {
         // Cache the response
@@ -75,7 +86,7 @@ class ClassroomService {
         status: 500,
         success: false,
         message: "Failed to fetch classrooms: $e",
-        data: [],
+        data: null,
       );
     }
   }

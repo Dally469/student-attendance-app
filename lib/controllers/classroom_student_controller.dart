@@ -19,7 +19,7 @@ class ClassroomStudentController extends GetxController {
       errorMessage.value = '';
 
       final result = await _authService.fetchStudents(classroom);
-      if (result.success) {
+      if (result.success!) {
         students.assignAll(result.data ?? []);
       } else {
         errorMessage.value = result.message ?? 'Failed to fetch students';

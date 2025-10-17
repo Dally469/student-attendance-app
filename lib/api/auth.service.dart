@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:attendance/models/single.student.model.dart';
 import 'package:attendance/models/student.model.dart';
 import 'package:attendance/models/user.login.model.dart';
+import 'package:flutter/cupertino.dart';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
@@ -20,20 +21,34 @@ class AuthService {
       String username, String password) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     Map<String, String> headers = {'Content-Type': 'application/json'};
+    
+    final url = '${dotenv.get('mainUrl')}/auth/login';
+    final requestBody = {'username': username, 'password': '***'}; // Hide password in logs
+    
+    debugPrint('=== POST Login Request ===');
+    debugPrint('URL: $url');
+    debugPrint('Headers: $headers');
+    debugPrint('Body: ${json.encode(requestBody)}');
+    
     var response = await http.post(
-        Uri.parse('${dotenv.get('mainUrl')}/auth/login'),
+        Uri.parse(url),
         headers: headers,
         body: json.encode({
           'username': username.toString(),
           'password': password.toString()
         }));
 
+    debugPrint('Response Status: ${response.statusCode}');
+    debugPrint('Response Body: ${response.body}');
+    debugPrint('=========================');
+    
     Map<String, dynamic> results = jsonDecode(response.body);
     if (response.statusCode == 200) {
       UserLoginModel model = UserLoginModel.fromJson(results);
       sharedPreferences.setString('currentUser', jsonEncode(model.data));
       sharedPreferences.setString('currentSchool', jsonEncode(model.data?.school));
       sharedPreferences.setString('token', jsonEncode(model.token));
+      sharedPreferences.setString('role', jsonEncode(model.data?.role));
       
       return model;
     } else if (response.statusCode == 400) {
@@ -56,11 +71,20 @@ Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
         };
 
     try {
+      final url = '${dotenv.get('mainUrl')}/api/classrooms';
+      
+      debugPrint('=== GET Classrooms Request ===');
+      debugPrint('URL: $url');
+      debugPrint('Headers: ${_setHeaders()}');
+      
       final response = await http.get(
-        Uri.parse('${dotenv.get('mainUrl')}/api/classrooms'),
+        Uri.parse(url),
         headers: _setHeaders(),
       );
 
+      debugPrint('Response Status: ${response.statusCode}');
+      debugPrint('Response Body: ${response.body}');
+      debugPrint('==============================');
     
       final Map<String, dynamic> results = jsonDecode(response.body);
   
@@ -75,7 +99,7 @@ Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
         status: 500,
         success: false,
         message: "Failed to fetch classrooms: $e",
-        data: [],
+        data: null,
       );
     }
   }
@@ -91,12 +115,22 @@ Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
           'Authorization': newToken
         };
 
+    final url = '${dotenv.get('mainUrl')}/api/students/filter/classroom';
+    final requestBody = {'classroom': classroom.toString()};
+    
+    debugPrint('=== POST Filter Students Request ===');
+    debugPrint('URL: $url');
+    debugPrint('Headers: ${_setHeaders()}');
+    debugPrint('Body: ${json.encode(requestBody)}');
+    
     var response = await http.post(
-        Uri.parse('${dotenv.get('mainUrl')}/api/students/filter/classroom'),
+        Uri.parse(url),
         headers: _setHeaders(),
-        body: json.encode({
-          'classroom': classroom.toString(),
-        }));
+        body: json.encode(requestBody));
+
+    debugPrint('Response Status: ${response.statusCode}');
+    debugPrint('Response Body: ${response.body}');
+    debugPrint('====================================');
 
     Map<String, dynamic> results = jsonDecode(response.body);
 
@@ -142,16 +176,24 @@ Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
           'Accept': 'application/json',
           'Authorization': newToken
         };
+    final url = '${dotenv.get('mainUrl')}/api/students/$studentId/assign-card';
+    final requestBody = {'cardId': cardId.toString()};
+    
+    debugPrint('=== POST Assign Card Request ===');
+    debugPrint('URL: $url');
+    debugPrint('Headers: ${_setHeaders()}');
+    debugPrint('Body: ${json.encode(requestBody)}');
+    
     var response = await http.post(
-        Uri.parse(
-            '${dotenv.get('mainUrl')}/api/students/$studentId/assign-card'),
+        Uri.parse(url),
         headers: _setHeaders(),
-        body: json.encode({
-          'cardId': cardId.toString(),
-        }));
+        body: json.encode(requestBody));
 
+    debugPrint('Response Status: ${response.statusCode}');
+    debugPrint('Response Body: ${response.body}');
+    debugPrint('================================');
+    
     Map<String, dynamic> results = jsonDecode(response.body);
-    print(results);
 
     if (response.statusCode == 200) {
       SingleStudentModel schoolClassroomModel =
@@ -169,7 +211,12 @@ Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
     }
   }
 
-  Future<AttendanceModel> createAttendance(String classroomId) async {
+  Future<AttendanceModel> createAttendance(
+    String classroomId, {
+    required String mode,
+    required String deviceType,
+    required String schoolId,
+  }) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     String? token = sharedPreferences.getString("token") ?? "";
 
@@ -181,14 +228,31 @@ Future<SchoolClassroomModel> fetchSchoolClassrooms(String token) async {
           'Authorization': newToken
         };
 
+    // Prepare request body
+    final requestBody = {
+      'mode': mode,
+      'deviceType': deviceType,
+      'schoolId': schoolId,
+    };
+    
+    final url = '${dotenv.get('mainUrl')}/api/attendance/classroom/$classroomId';
+    
+    debugPrint('=== POST Create Attendance Request ===');
+    debugPrint('URL: $url');
+    debugPrint('Headers: ${_setHeaders()}');
+    debugPrint('Body: ${json.encode(requestBody)}');
+    
     var response = await http.post(
-      Uri.parse(
-          '${dotenv.get('mainUrl')}/api/attendance/classroom/$classroomId'),
+      Uri.parse(url),
       headers: _setHeaders(),
+      body: json.encode(requestBody),
     );
 
+    debugPrint('Response Status: ${response.statusCode}');
+    debugPrint('Response Body: ${response.body}');
+    debugPrint('======================================');
+    
     Map<String, dynamic> results = jsonDecode(response.body);
-    print(results);
 
     // Parse the response using the updated model structure
     AttendanceModel attendanceModel = AttendanceModel.fromJson(results);

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:attendance/routes/routes.names.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -14,7 +15,6 @@ class UserData {
 class Strings {
   static const String appName = 'SCHOOL';
 }
-
 
 class Splash extends StatefulWidget {
   const Splash({Key? key}) : super(key: key);
@@ -31,7 +31,7 @@ class _SplashState extends State<Splash> with TickerProviderStateMixin {
   late List<Animation<Offset>> _letterAnimations;
   late List<Animation<double>> _letterOpacities;
   late UserData user;
-  String? jsonCheck, json, jsonToken;
+  String? jsonCheck, json, jsonToken, jsonRole;
 
   @override
   void initState() {
@@ -105,28 +105,88 @@ class _SplashState extends State<Splash> with TickerProviderStateMixin {
   }
 
   Future<Timer> startTime() async {
-    final prefs = await SharedPreferences.getInstance();
-    json = prefs.getString('currentUser') ?? 'no';
-    jsonToken = prefs.getString('token') ?? 'no';
-    jsonCheck = prefs.getString('currentUser') ?? 'no';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Get all necessary data
+      json = prefs.getString('currentUser');
+      jsonToken = prefs.getString('token');
+      jsonRole = prefs.getString('role');
+      
+      debugPrint('Stored user data: $json');
+      debugPrint('Stored token: $jsonToken');
+      debugPrint('Stored role: $jsonRole');
 
-    var duration = const Duration(milliseconds: 100);
+      var duration = const Duration(milliseconds: 2000); // Give consistent delay
 
-    if (jsonCheck == 'no') {
+      // Check if user is logged in (has both user data and token)
+      if (json == null || json == 'no' || jsonToken == null || jsonToken == 'no') {
+        debugPrint('User not logged in - redirecting to login');
+        jsonCheck = 'no';
+      } else {
+        debugPrint('User is logged in - checking role');
+        jsonCheck = 'yes';
+        
+        // Parse user data
+        try {
+          Map<String, dynamic> map = jsonDecode(json!);
+          user = UserData.fromJson(map);
+          
+          // If role is not stored separately, try to get it from user data
+          if (jsonRole == null || jsonRole == 'no') {
+            jsonRole = map['role'] ?? map['userRole'] ?? map['user_role'];
+            debugPrint('Role extracted from user data: $jsonRole');
+          }
+        } catch (e) {
+          debugPrint('Error parsing user data: $e');
+          jsonCheck = 'no'; // Treat as not logged in if data is corrupted
+        }
+      }
+
       return Timer(duration, navigationPage);
-    } else {
-      Map<String, dynamic> map = jsonDecode(json!);
-      user = UserData.fromJson(map);
-      duration = const Duration(seconds: 2);
-      return Timer(duration, navigationPage);
+    } catch (e) {
+      debugPrint('Error in startTime: $e');
+      jsonCheck = 'no';
+      return Timer(const Duration(milliseconds: 2000), navigationPage);
     }
   }
 
   void navigationPage() {
-    if (jsonCheck == 'no') {
-      Get.toNamed('/login');
-    } else {
-      Get.toNamed('/home');
+    try {
+      debugPrint('Navigating... jsonCheck: $jsonCheck, jsonRole: $jsonRole');
+      
+      if (jsonCheck == 'no') {
+        debugPrint('Navigating to login');
+        Get.offAllNamed('/login'); // Use offAllNamed to clear navigation stack
+      } else {
+        // User is logged in, check role
+        if (jsonRole != null) {
+          String role = jsonRole!.toUpperCase(); // Ensure consistent case
+          String newRole = role.replaceAll('"', '');
+          debugPrint('User role (normalized): $newRole');
+          
+          switch (newRole) {
+            case "ADMIN":
+              debugPrint('Navigating to schools (admin)');
+              Get.offAllNamed('/schools');
+              break;
+            case "TEACHER":
+            case "STUDENT":
+            case "USER":
+            default:
+              debugPrint('Navigating to home (non-admin user)');
+              Get.offAllNamed('/home');
+              break;
+          }
+        } else {
+          debugPrint('No role found, navigating to home');
+          Get.offAllNamed('/home'); // Default to home if no role is specified
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in navigationPage: $e');
+      // Fallback navigation
+      Get.offAllNamed('/login');
     }
   }
 
