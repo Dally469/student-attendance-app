@@ -45,7 +45,7 @@ class _ParentCommunicationState extends State<ParentCommunication> {
 
     // Listen to filter changes to clear selections
     ever(_filterOption, (_) {
-      _studentController.toggleSelectAll(false, filter: _filterOption.value);
+      _studentController.toggleSelectAll(false);
       if (kDebugMode) {
         print("Filter changed to: ${_filterOption.value}, cleared selections");
       }
@@ -203,8 +203,7 @@ class _ParentCommunicationState extends State<ParentCommunication> {
                                 value: allSelected,
                                 onChanged: (value) {
                                   _studentController.toggleSelectAll(
-                                      value ?? false,
-                                      filter: _filterOption.value);
+                                      value ?? false);
                                   if (kDebugMode) {
                                     print(
                                         "Select All toggled: $value, filter: ${_filterOption.value}");

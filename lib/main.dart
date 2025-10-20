@@ -16,7 +16,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'api/facial.service.dart';
 import 'controllers/parent_communication_controller.dart';
 import 'controllers/school_fees_controller.dart';
 import 'controllers/sms.controller.dart';
@@ -57,11 +56,6 @@ Future<void> main() async {
   // Initialize GetX controllers
   _initializeGetXControllers();
 
-  try {
-    await Get.find<FacialService>().initModel();
-  } catch (e) {
-    print('Failed to initialize FacialService: $e');
-  }
 
   runApp(MyApp(showHome: showHome));
 }
@@ -102,7 +96,6 @@ void _initializeGetXControllers() {
   Get.put(ParentCommunicationController(), permanent: true);
   Get.put(SchoolFeesController(), permanent: true);
   Get.put(SMSController(), permanent: true);
-  Get.put(FacialService(), permanent: true);
   }
 
 class MyHttpOverrides extends HttpOverrides {

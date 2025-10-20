@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:attendance/models/attendance.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,7 +19,10 @@ class AttendanceService {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String key = 'offline_checkins_${checkIn.classroomId}';
       List<String> existingCheckins = prefs.getStringList(key) ?? [];
-      existingCheckins.add(jsonEncode(checkIn.toJson()));
+      // Ensure synced is false when saving
+      Map<String, dynamic> checkInJson = checkIn.toJson();
+      checkInJson['synced'] = false;
+      existingCheckins.add(jsonEncode(checkInJson));
       await prefs.setStringList(key, existingCheckins);
     } catch (e) {
       print('Error saving offline check-in: $e');
@@ -34,6 +38,8 @@ class AttendanceService {
     String? deviceIdentifier,
     String? notes,
     String? checkTime,
+    String? mode,
+    bool autoCheckOutPrevious = false,
   }) async {
     // Call the legacy method and convert the result
     legacy.CheckInModel legacyResult = await markAttendance(
@@ -44,6 +50,8 @@ class AttendanceService {
       deviceIdentifier: deviceIdentifier,
       notes: notes,
       checkTime: checkTime,
+      mode: mode,
+      autoCheckOutPrevious: autoCheckOutPrevious,
     );
     
     // Convert legacy model to new model
@@ -73,70 +81,91 @@ class AttendanceService {
     String? deviceIdentifier,
     String? notes,
     String? checkTime,
+    String? mode,
+    bool autoCheckOutPrevious = false,
   }) async {
     try {
+      SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
+      String? token = sharedPreferences.getString("token");
+      if (token == null) {
+        return legacy.CheckInModel(
+          success: false,
+          status: 401,
+          message: 'Authentication token not found',
+        );
+      }
+
+      Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': token,
+      };
+
+      // Build request body matching EnhancedCheckInRequestDTO
+      Map<String, dynamic> body = {
+        'studentId': studentId,
+        'classroomId': classroomId,
+        'attendanceId': attendanceId,
+        'deviceType': deviceType,
+        'autoCheckOutPrevious': autoCheckOutPrevious,
+      };
+      if (deviceIdentifier != null && deviceIdentifier.isNotEmpty) {
+        body['deviceIdentifier'] = deviceIdentifier;
+      }
+      if (notes != null && notes.isNotEmpty) {
+        body['notes'] = notes;
+      }
+      if (mode != null && mode.isNotEmpty) {
+        body['mode'] = mode;
+      }
+      String checkInTimeStr = checkTime ?? DateTime.now().toIso8601String();
+      body['checkInTime'] = checkInTimeStr;
+
+      final uri = Uri.parse('${dotenv.get('mainUrl')}/api/student-attendance/check-in');
+      
+      print('=== POST Check-In Request ===');
+      print('URL: $uri');
+      print('Headers: $headers');
+      print('Body: ${jsonEncode(body)}');
+
+      var response = await http.post(
+        uri,
+        headers: headers,
+        body: jsonEncode(body),
+      );
+
+      print('Response Status: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+      print('=============================');
+      
+      Map<String, dynamic> results = jsonDecode(response.body);
+
       var connectivityResult = await Connectivity().checkConnectivity();
       bool hasInternet = connectivityResult != ConnectivityResult.none;
 
-      if (hasInternet) {
-        SharedPreferences sharedPreferences =
-            await SharedPreferences.getInstance();
-        String? token = sharedPreferences.getString("token");
-
-        Map<String, String> headers = {
-          'Content-Type': 'application/json',
-          'Authorization': '${token.toString()}}',
-        };
-
-        // Build query parameters
-        final queryParams = <String, String>{
-          'deviceType': deviceType,
-        };
-        if (deviceIdentifier != null && deviceIdentifier.isNotEmpty) {
-          queryParams['deviceIdentifier'] = deviceIdentifier;
-        }
-        if (notes != null && notes.isNotEmpty) {
-          queryParams['notes'] = notes;
-        }
-        if (checkTime != null && checkTime.isNotEmpty) {
-          queryParams['checkTime'] = checkTime;
-        }
-
-        final uri = Uri.parse(
-          '${dotenv.get('mainUrl')}/api/attendance/check-in/$attendanceId/student/$studentId'
-        ).replace(queryParameters: queryParams);
-        
-        print('=== POST Check-In Request ===');
-        print('URL: $uri');
-        print('Headers: $headers');
-        print('Query Params: $queryParams');
-
-        var response = await http.post(uri, headers: headers);
-
-        print('Response Status: ${response.statusCode}');
-        print('Response Body: ${response.body}');
-        print('=============================');
-        
-        Map<String, dynamic> results = jsonDecode(response.body);
-
-        if (response.statusCode == 200) {
-          return legacy.CheckInModel.fromJson(results);
-        } else {
-          // Store offline if API call fails
+      if (response.statusCode == 200) {
+        return legacy.CheckInModel.fromJson(results);
+      } else {
+        // Store offline if API call fails (only if had internet but failed)
+        if (hasInternet) {
           await saveOfflineCheckIn(OfflineCheckIn(
             studentId: studentId,
             classroomId: classroomId,
             attendanceId: attendanceId,
-            timestamp: DateTime.now(),
+            timestamp: DateTime.parse(checkInTimeStr),
           ));
-
-          return legacy.CheckInModel(
-            success: false,
-            status: response.statusCode,
-            message: results['message'] ?? 'Failed to check in',
-          );
         }
-      } else {
+
+        return legacy.CheckInModel(
+          success: false,
+          status: response.statusCode,
+          message: results['message'] ?? 'Failed to check in',
+        );
+      }
+    } catch (e) {
+      var connectivityResult = await Connectivity().checkConnectivity();
+      bool hasInternet = connectivityResult != ConnectivityResult.none;
+
+      if (!hasInternet) {
         // Store offline if no internet
         await saveOfflineCheckIn(OfflineCheckIn(
           studentId: studentId,
@@ -151,7 +180,7 @@ class AttendanceService {
           message: 'Stored offline, will sync when online',
         );
       }
-    } catch (e) {
+
       return legacy.CheckInModel(
         success: false,
         status: 500,
@@ -163,11 +192,13 @@ class AttendanceService {
   // Check-out a student
   Future<legacy.CheckInModel> checkOutStudent({
     required String studentId,
+    required String classroomId,
     required String attendanceId,
     String deviceType = 'MANUAL',
     String? deviceIdentifier,
     String? notes,
     String? checkTime,
+    String? mode,
   }) async {
     try {
       var connectivityResult = await Connectivity().checkConnectivity();
@@ -181,39 +212,52 @@ class AttendanceService {
         );
       }
 
-      SharedPreferences sharedPreferences =
-          await SharedPreferences.getInstance();
+      SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
       String? token = sharedPreferences.getString("token");
+      if (token == null) {
+        return legacy.CheckInModel(
+          success: false,
+          status: 401,
+          message: 'Authentication token not found',
+        );
+      }
 
       Map<String, String> headers = {
         'Content-Type': 'application/json',
-        'Authorization': '${token.toString()}}',
+        'Authorization': token,
       };
 
-      // Build query parameters
-      final queryParams = <String, String>{
+      // Build request body (assuming similar structure to check-in DTO but for check-out)
+      Map<String, dynamic> body = {
+        'studentId': studentId,
+        'classroomId': classroomId,
+        'attendanceId': attendanceId,
         'deviceType': deviceType,
       };
       if (deviceIdentifier != null && deviceIdentifier.isNotEmpty) {
-        queryParams['deviceIdentifier'] = deviceIdentifier;
+        body['deviceIdentifier'] = deviceIdentifier;
       }
       if (notes != null && notes.isNotEmpty) {
-        queryParams['notes'] = notes;
+        body['notes'] = notes;
       }
-      if (checkTime != null && checkTime.isNotEmpty) {
-        queryParams['checkTime'] = checkTime;
+      if (mode != null && mode.isNotEmpty) {
+        body['mode'] = mode;
       }
+      String checkOutTimeStr = checkTime ?? DateTime.now().toIso8601String();
+      body['checkOutTime'] = checkOutTimeStr;
 
-      final uri = Uri.parse(
-        '${dotenv.get('mainUrl')}/api/attendance/check-out/$attendanceId/student/$studentId'
-      ).replace(queryParameters: queryParams);
+      final uri = Uri.parse('${dotenv.get('mainUrl')}/api/attendance/check-out');
       
       print('=== POST Check-Out Request ===');
       print('URL: $uri');
       print('Headers: $headers');
-      print('Query Params: $queryParams');
+      print('Body: ${jsonEncode(body)}');
 
-      var response = await http.post(uri, headers: headers);
+      var response = await http.post(
+        uri,
+        headers: headers,
+        body: jsonEncode(body),
+      );
 
       print('Response Status: ${response.statusCode}');
       print('Response Body: ${response.body}');
@@ -232,6 +276,109 @@ class AttendanceService {
       }
     } catch (e) {
       return legacy.CheckInModel(
+        success: false,
+        status: 500,
+        message: 'Error: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Checks if the classroom has attendance records for the specified date.
+  /// Date must be in YYYY-MM-DD format. Mode and deviceType are optional.
+  Future<AttendanceModel> getAttendanceByClassroomDate(
+    String classroomId,
+    String date,
+  ) async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('token');
+
+      if (token == null) {
+        return AttendanceModel(
+          success: false,
+          status: 401,
+          message: 'Authentication token not found',
+        );
+      }
+
+      Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': token,
+      };
+
+      final uri = Uri.parse(
+        '${dotenv.get('mainUrl')}/api/attendance/classroom/$classroomId/date?date=$date',
+      );
+
+      print('=== GET Attendance by Date Request ===');
+      print('URL: $uri');
+      print('Headers: $headers');
+
+      var response = await http.get(uri, headers: headers);
+
+      print('Response Status: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+      print('======================================');
+
+      // Handle non-200 responses
+      if (response.statusCode != 200) {
+        Map<String, dynamic> errorResults = jsonDecode(response.body);
+        return AttendanceModel(
+          success: false,
+          status: response.statusCode,
+          message: errorResults['message'] ?? 'Failed to fetch attendance',
+        );
+      }
+
+      Map<String, dynamic> results = jsonDecode(response.body);
+
+      // Check if success is false even with 200 status
+      if (results['success'] == false) {
+        return AttendanceModel(
+          success: false,
+          status: response.statusCode,
+          message: results['message'] ?? 'No attendance found',
+        );
+      }
+
+      // Handle the data field
+      if (results['data'] == null) {
+        return AttendanceModel(
+          success: false,
+          status: 404,
+          message: 'No attendance records found for this date',
+        );
+      }
+
+      // If the API returns a list
+      if (results['data'] is List) {
+        final dataList = results['data'] as List;
+        
+        // If list is empty
+        if (dataList.isEmpty) {
+          return AttendanceModel(
+            success: false,
+            status: 404,
+            message: 'No attendance records found for this date',
+          );
+        }
+        
+        // Take the first item from the list
+        final firstAttendance = dataList[0];
+        return AttendanceModel.fromJson({
+          'success': results['success'],
+          'status': response.statusCode,
+          'message': results['message'],
+          'data': firstAttendance,
+        });
+      }
+      
+      // If it's already a single object
+      return AttendanceModel.fromJson(results);
+    } catch (e, stackTrace) {
+      print('Error in getAttendanceByClassroomDate: $e');
+      print('Stack trace: $stackTrace');
+      return AttendanceModel(
         success: false,
         status: 500,
         message: 'Error: ${e.toString()}',
@@ -271,36 +418,93 @@ class AttendanceService {
         return false;
       }
 
-      // Group offline check-ins by classroom ID
-      Map<String, List<OfflineCheckIn>> checkInsByClassroom = {};
       List<OfflineCheckIn> unsyncedCheckIns = await getUnsyncedCheckIns();
       
       if (unsyncedCheckIns.isEmpty) return true;
       
-      // Group check-ins by classroom for batch processing
+      // Group check-ins by classroom and date for accurate syncing
+      Map<String, Map<String, List<OfflineCheckIn>>> groupedCheckIns = {};
       for (var checkIn in unsyncedCheckIns) {
-        if (!checkInsByClassroom.containsKey(checkIn.classroomId)) {
-          checkInsByClassroom[checkIn.classroomId] = [];
-        }
-        checkInsByClassroom[checkIn.classroomId]!.add(checkIn);
+        String classroomId = checkIn.classroomId;
+        String dateStr = _formatDate(checkIn.timestamp);
+        groupedCheckIns.putIfAbsent(classroomId, () => <String, List<OfflineCheckIn>>{});
+        groupedCheckIns[classroomId]!.putIfAbsent(dateStr, () => <OfflineCheckIn>[]);
+        groupedCheckIns[classroomId]![dateStr]!.add(checkIn);
       }
       
-      // Sync attendance records by classroom
-      for (var classroomId in checkInsByClassroom.keys) {
-        final success = await _syncAttendanceRecordsByClassroom(
-          classroomId,
-          checkInsByClassroom[classroomId]!,
-        );
-        
-        if (!success) {
-          print('Failed to sync records for classroom: $classroomId');
+      bool allSuccess = true;
+      
+      // Sync by classroom and date
+      for (var classroomEntry in groupedCheckIns.entries) {
+        String classroomId = classroomEntry.key;
+        for (var dateEntry in classroomEntry.value.entries) {
+          String dateStr = dateEntry.key;
+          List<OfflineCheckIn> checkInsForDate = dateEntry.value;
+          
+          // Check if attendance already exists for this date
+          AttendanceModel attendance = await getAttendanceByClassroomDate(
+            classroomId,
+            dateStr,
+          );
+          
+          if (attendance.success == true && attendance.data != null) {
+            print('Attendance already exists for classroom $classroomId on $dateStr, marking offline records as synced');
+            await _markCheckInsAsSynced(classroomId, checkInsForDate);
+            continue;
+          }
+          
+          // Sync the records
+          final syncSuccess = await _syncAttendanceRecordsByClassroomDate(
+            classroomId,
+            dateStr,
+            checkInsForDate,
+          );
+          
+          if (syncSuccess) {
+            await _markCheckInsAsSynced(classroomId, checkInsForDate);
+          } else {
+            print('Failed to sync records for classroom $classroomId on $dateStr');
+            allSuccess = false;
+          }
         }
       }
       
-      return true;
+      return allSuccess;
     } catch (e) {
       print('Error syncing offline check-ins: $e');
       return false;
+    }
+  }
+
+  // Helper to format date as YYYY-MM-DD
+  String _formatDate(DateTime dateTime) {
+    return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
+  }
+
+  // Helper to mark specific check-ins as synced by updating the synced field
+  Future<void> _markCheckInsAsSynced(String classroomId, List<OfflineCheckIn> checkIns) async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String key = 'offline_checkins_$classroomId';
+      List<String> existingCheckins = prefs.getStringList(key) ?? [];
+      List<String> updatedCheckins = [];
+      
+      Set<String> checkInSignatures = checkIns.map((checkIn) => 
+        '${checkIn.studentId}_${checkIn.timestamp.toIso8601String()}'
+      ).toSet();
+      
+      for (String recordStr in existingCheckins) {
+        Map<String, dynamic> recordJson = json.decode(recordStr);
+        String signature = '${recordJson['studentId']}_${recordJson['timestamp']}';
+        if (checkInSignatures.contains(signature)) {
+          recordJson['synced'] = true;
+        }
+        updatedCheckins.add(jsonEncode(recordJson));
+      }
+      
+      await prefs.setStringList(key, updatedCheckins);
+    } catch (e) {
+      print('Error marking check-ins as synced for classroom $classroomId: $e');
     }
   }
   
@@ -328,9 +532,12 @@ class AttendanceService {
     return deviceId;
   }
   
-  // Sync attendance records for a specific classroom
-  Future<bool> _syncAttendanceRecordsByClassroom(
-      String classroomId, List<OfflineCheckIn> checkIns) async {
+  // Sync attendance records for a specific classroom and date
+  Future<bool> _syncAttendanceRecordsByClassroomDate(
+    String classroomId,
+    String attendanceDate,
+    List<OfflineCheckIn> checkIns,
+  ) async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? token = prefs.getString("token");
@@ -342,10 +549,6 @@ class AttendanceService {
       
       // Get device ID for the request
       String deviceId = await _getDeviceId();
-      
-      // Format the date as required in the request (YYYY-MM-DD)
-      final now = DateTime.now();
-      final attendanceDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       
       // Convert offline check-ins to attendance records
       List<AttendanceRecord> attendanceRecords = checkIns.map((checkIn) {
@@ -379,7 +582,7 @@ class AttendanceService {
       print('URL: $url');
       print('Headers: $headers');
       print('Body: ${json.encode(requestBody)}');
-      print('Syncing ${attendanceRecords.length} records for classroom: $classroomId');
+      print('Syncing ${attendanceRecords.length} records for classroom: $classroomId on date: $attendanceDate');
       
       var response = await http.post(
         Uri.parse(url),
@@ -392,26 +595,13 @@ class AttendanceService {
       print('====================================');
       
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Clear the successfully synced records from storage
-        String key = 'offline_checkins_$classroomId';
-        List<String> existingCheckins = prefs.getStringList(key) ?? [];
-        
-        // Remove all the synced check-ins for this classroom
-        existingCheckins.removeWhere((record) {
-          var recordJson = json.decode(record);
-          return checkIns.any((checkIn) =>
-              recordJson['studentId'] == checkIn.studentId &&
-              recordJson['timestamp'] == checkIn.timestamp.toIso8601String());
-        });
-        
-        await prefs.setStringList(key, existingCheckins);
         return true;
       } else {
         print('API error: ${response.statusCode} - ${response.body}');
         return false;
       }
     } catch (e) {
-      print('Error syncing attendance records for classroom $classroomId: $e');
+      print('Error syncing attendance records for classroom $classroomId on $attendanceDate: $e');
       return false;
     }
   }

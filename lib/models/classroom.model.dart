@@ -68,7 +68,7 @@ class Data {
 class Classrooms {
   String? name;
   String? id;
-  Null? department;
+  Department? department;
   Statistics? statistics;
 
   Classrooms({this.name, this.id, this.department, this.statistics});
@@ -76,7 +76,9 @@ class Classrooms {
   Classrooms.fromJson(Map<String, dynamic> json) {
     name = json['name'];
     id = json['id'];
-    department = json['department'];
+    department = json['department'] != null
+        ? Department.fromJson(json['department'])
+        : null;
     statistics = json['statistics'] != null
         ? Statistics.fromJson(json['statistics'])
         : null;
@@ -86,10 +88,31 @@ class Classrooms {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['name'] = name;
     data['id'] = id;
-    data['department'] = department;
+    if (department != null) {
+      data['department'] = department!.toJson();
+    }
     if (statistics != null) {
       data['statistics'] = statistics!.toJson();
     }
+    return data;
+  }
+}
+
+class Department {
+  String? id;
+  String? name;
+
+  Department({this.id, this.name});
+
+  Department.fromJson(Map<String, dynamic> json) {
+    id = json['id'];
+    name = json['name'];
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['id'] = id;
+    data['name'] = name;
     return data;
   }
 }

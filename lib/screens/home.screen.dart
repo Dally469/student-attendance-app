@@ -8,6 +8,7 @@ import 'package:attendance/models/classroom.model.dart';
 import 'package:attendance/models/school.fee.type.dart';
 import 'package:attendance/models/student.model.dart';
 import 'package:attendance/routes/routes.names.dart';
+import 'package:attendance/screens/create.attendance.bottomsheet.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -146,14 +147,14 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
       child: Column(
         children: [
           UserAccountsDrawerHeader(
-            decoration: BoxDecoration(color: primaryColor),
+            decoration: const BoxDecoration(color: primaryColor),
             currentAccountPicture: CircleAvatar(
               backgroundColor: Theme.of(context).colorScheme.surface,
               child: Text(
                 userFullNames?.isNotEmpty == true
                     ? userFullNames![0].toUpperCase()
                     : "U",
-                style: TextStyle(
+                style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: primaryColor),
@@ -393,231 +394,26 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
     );
   }
 
-  void _showAttendanceConfigDialog(
-      BuildContext context, Classrooms classroomData) {
-    String selectedMode = 'CHECK_IN_ONLY';
-    String selectedDeviceType = 'FACE';
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.settings,
-                  color: primaryColor, size: 24, semanticLabel: 'Settings icon'),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Attendance Configuration',
-                  style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w700, fontSize: 18),
-                ),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Configure attendance settings for "${classroomData.name ?? 'Unknown'}"',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Theme.of(context).colorScheme.onSurface),
-                ),
-                const SizedBox(height: 20),
-                // Device Type Selection
-                Text(
-                  'Device Type',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .outline
-                            .withOpacity(0.3)),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      RadioListTile<String>(
-                        title: Row(
-                          children: [
-                            Icon(Icons.face,
-                                color: primaryColor,
-                                size: 20,
-                                semanticLabel: 'Face recognition'),
-                            const SizedBox(width: 8),
-                            Text('Face Recognition',
-                                style: GoogleFonts.poppins(fontSize: 14)),
-                          ],
-                        ),
-                        value: 'FACE',
-                        groupValue: selectedDeviceType,
-                        activeColor: primaryColor,
-                        onChanged: (value) {
-                          setState(() {
-                            selectedDeviceType = value!;
-                          });
-                        },
-                      ),
-                      Divider(
-                          height: 1,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .outline
-                              .withOpacity(0.2)),
-                      RadioListTile<String>(
-                        title: Row(
-                          children: [
-                            Icon(Icons.credit_card,
-                                color: orangeColor,
-                                size: 20,
-                                semanticLabel: 'RFID card'),
-                            const SizedBox(width: 8),
-                            Text('RFID Card',
-                                style: GoogleFonts.poppins(fontSize: 14)),
-                          ],
-                        ),
-                        value: 'CARD',
-                        groupValue: selectedDeviceType,
-                        activeColor: primaryColor,
-                        onChanged: (value) {
-                          setState(() {
-                            selectedDeviceType = value!;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                // Mode Selection
-                Text(
-                  'Attendance Mode',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .outline
-                            .withOpacity(0.3)),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      RadioListTile<String>(
-                        title: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Check In Only',
-                                style: GoogleFonts.poppins(
-                                    fontSize: 14, fontWeight: FontWeight.w500)),
-                            Text('Students can only check in',
-                                style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withOpacity(0.6))),
-                          ],
-                        ),
-                        value: 'CHECK_IN_ONLY',
-                        groupValue: selectedMode,
-                        activeColor: primaryColor,
-                        onChanged: (value) {
-                          setState(() {
-                            selectedMode = value!;
-                          });
-                        },
-                      ),
-                      Divider(
-                          height: 1,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .outline
-                              .withOpacity(0.2)),
-                      RadioListTile<String>(
-                        title: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Check In / Check Out',
-                                style: GoogleFonts.poppins(
-                                    fontSize: 14, fontWeight: FontWeight.w500)),
-                            Text('Students can check in and check out',
-                                style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withOpacity(0.6))),
-                          ],
-                        ),
-                        value: 'CHECK_IN_OUT',
-                        groupValue: selectedMode,
-                        activeColor: primaryColor,
-                        onChanged: (value) {
-                          setState(() {
-                            selectedMode = value!;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text('Cancel',
-                  style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _createAttendanceWithConfig(
-                  classroomData,
-                  selectedMode,
-                  selectedDeviceType,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                elevation: 2,
-                shadowColor: primaryColor.withOpacity(0.3),
-              ),
-              child: Text('Create Attendance',
-                  style: GoogleFonts.poppins(fontSize: 14)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+void _showAttendanceConfigBottomSheet(BuildContext context, Classrooms classroomData) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    isDismissible: true,
+    enableDrag: true,
+    builder: (context) => AttendanceConfigBottomSheet(
+      classroom: classroomData,
+      onAttendanceReady: (String attendanceId) {
+        // Navigate to attendance screen with the attendance ID
+        Get.toNamed(makeAttendance, parameters: {
+          'classroomId': classroomData.id.toString(),
+          'classroom': classroomData.name.toString(),
+          'attendanceId': attendanceId,
+        });
+      },
+    ),
+  );
+}
 
   void _createAttendanceWithConfig(
       Classrooms classroomData, String mode, String deviceType) {
@@ -690,7 +486,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
         builder: (context) => AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.school_rounded,
+              const Icon(Icons.school_rounded,
                   color: primaryColor,
                   size: 24,
                   semanticLabel: 'Classroom icon'),
@@ -775,16 +571,10 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
           });
           break;
         case 'attendance':
-          _showAttendanceConfigDialog(context, classroomData);
+                _showAttendanceConfigBottomSheet(context, classroomData);
           break;
         case 'communication':
           Get.toNamed(parentCommunication, parameters: {
-            'classroom': classroomData.name.toString(),
-            'classroomId': classroomData.id.toString(),
-          });
-          break;
-        case 'facial':
-          Get.toNamed(assignFacialData, parameters: {
             'classroom': classroomData.name.toString(),
             'classroomId': classroomData.id.toString(),
           });
@@ -807,7 +597,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
         builder: (context) => AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.account_balance_wallet_rounded,
+              const Icon(Icons.account_balance_wallet_rounded,
                   color: primaryColor, size: 24, semanticLabel: 'Fee icon'),
               const SizedBox(width: 8),
               Text('Confirm Fee Application',
@@ -1288,7 +1078,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                       decoration: BoxDecoration(
                           color: primaryColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12)),
-                      child: Icon(Icons.account_balance_wallet_rounded,
+                      child: const Icon(Icons.account_balance_wallet_rounded,
                           color: primaryColor,
                           size: 24,
                           semanticLabel: 'Fee type icon'),
@@ -1467,7 +1257,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                   decoration: BoxDecoration(
                       color: primaryColor.withOpacity(0.1),
                       shape: BoxShape.circle),
-                  child: Icon(Icons.account_balance_wallet_rounded,
+                  child: const Icon(Icons.account_balance_wallet_rounded,
                       color: primaryColor, size: 24, semanticLabel: 'Fee type'),
                 ),
                 const SizedBox(width: 16),
@@ -1513,7 +1303,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                   decoration: BoxDecoration(
                       color: primaryColor.withOpacity(0.1),
                       shape: BoxShape.circle),
-                  child: Icon(Icons.arrow_forward,
+                  child: const Icon(Icons.arrow_forward,
                       size: 20,
                       color: primaryColor,
                       semanticLabel: 'Select fee'),
@@ -1564,7 +1354,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                 decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(8)),
-                child: Icon(Icons.school,
+                child: const Icon(Icons.school,
                     color: primaryColor, semanticLabel: 'School icon'),
               ),
               const SizedBox(width: 12),
@@ -1583,7 +1373,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
           ),
           actions: [
             IconButton(
-              icon: Icon(Icons.notifications_outlined,
+              icon: const Icon(Icons.notifications_outlined,
                   semanticLabel: 'Notifications'),
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1664,7 +1454,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                         decoration: BoxDecoration(
                             color: primaryColorOverlay.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8)),
-                        child: Icon(Icons.person,
+                        child: const Icon(Icons.person,
                             color: primaryColor,
                             size: 24,
                             semanticLabel: 'User avatar'),
@@ -1684,9 +1474,6 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                   const SizedBox(height: 24),
                   _buildServiceCard(
                       'Assign Student Card', 'assets/images/nfc.png', 'card'),
-                  const SizedBox(height: 16),
-                  _buildServiceCard('Assign Facial Recognition',
-                      'assets/images/nfc.png', 'facial'),
                   const SizedBox(height: 16),
                   _buildServiceCard('Record Attendance',
                       'assets/images/attendance.png', 'attendance'),
@@ -1711,6 +1498,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
   }
 }
 
+
 class _ClassroomBottomSheet extends StatefulWidget {
   final RxString selectedService;
   final SchoolClassroomController schoolClassroomController;
@@ -1729,7 +1517,8 @@ class _ClassroomBottomSheet extends StatefulWidget {
 class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -1738,15 +1527,26 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
     _animationController.forward();
+
+    // Initialize search controller with current search query
+    _searchController.text = widget.schoolClassroomController.searchQuery.value;
+    
+    // Listen to controller's search query changes
+    ever(widget.schoolClassroomController.searchQuery, (query) {
+      if (_searchController.text != query) {
+        _searchController.text = query;
+      }
+    });
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    // Clear search when bottom sheet closes
+    widget.schoolClassroomController.clearSearch();
     super.dispose();
   }
 
@@ -1758,9 +1558,17 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
       if (widget.schoolClassroomController.errorMessage.value.isNotEmpty) {
         return _buildEmptyState();
       }
-      if (widget.schoolClassroomController.classrooms.isNotEmpty) {
+      
+      // Use filtered classrooms instead of all classrooms
+      if (widget.schoolClassroomController.filteredClassrooms.isNotEmpty) {
         return _buildClassroomListContent();
       }
+      
+      // Show different empty state based on whether user is searching
+      if (widget.schoolClassroomController.searchQuery.value.isNotEmpty) {
+        return _buildNoSearchResultsState();
+      }
+      
       return _buildEmptyState();
     });
   }
@@ -1776,9 +1584,10 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
             Text(
               'Loading classrooms...',
               style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -1792,17 +1601,20 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.school_outlined,
-                size: 64,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                semanticLabel: 'No classrooms'),
+            Icon(
+              Icons.school_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              semanticLabel: 'No classrooms',
+            ),
             const SizedBox(height: 16),
             Text(
               'No classrooms found',
               style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 8),
             Padding(
@@ -1810,22 +1622,78 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
               child: Text(
                 'You don\'t have any classrooms assigned to your school yet.',
                 style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () =>
-                  widget.schoolClassroomController.getSchoolClassrooms(),
+            ElevatedButton.icon(
+              onPressed: () => widget.schoolClassroomController.getSchoolClassrooms(forceRefresh: true),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: Text('Retry', style: GoogleFonts.poppins(fontSize: 14)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
-              child: Text('Retry', style: GoogleFonts.poppins(fontSize: 14)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoSearchResultsState() {
+    return Expanded(
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              semanticLabel: 'No search results',
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No results found',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Obx(() => Text(
+                'No classrooms match "${widget.schoolClassroomController.searchQuery.value}"',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              )),
+            ),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () {
+                widget.schoolClassroomController.clearSearch();
+                _searchController.clear();
+                _searchFocusNode.unfocus();
+              },
+              icon: const Icon(Icons.clear, size: 18),
+              label: Text('Clear search', style: GoogleFonts.poppins(fontSize: 14)),
+              style: TextButton.styleFrom(
+                foregroundColor: primaryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
             ),
           ],
         ),
@@ -1834,23 +1702,109 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
   }
 
   Widget _buildClassroomListContent() {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height - 250,
-      child: ListView.builder(
-        itemCount: widget.schoolClassroomController.classrooms.length,
-        itemBuilder: (context, index) => _buildClassroomCard(
-          widget.schoolClassroomController.classrooms[index],
-          widget.selectedService.value,
-        ),
+    return Expanded(
+      child: Column(
+        children: [
+          // Show result count
+          Obx(() {
+            final filteredCount = widget.schoolClassroomController.filteredClassrooms.length;
+            final totalCount = widget.schoolClassroomController.classrooms.length;
+            final isSearching = widget.schoolClassroomController.searchQuery.value.isNotEmpty;
+            
+            if (!isSearching) return const SizedBox.shrink();
+            
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  Text(
+                    'Found $filteredCount of $totalCount classroom${totalCount != 1 ? 's' : ''}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          
+          // Classroom list
+          Expanded(
+            child: Obx(() => ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              itemCount: widget.schoolClassroomController.filteredClassrooms.length,
+              itemBuilder: (context, index) => _buildClassroomCard(
+                widget.schoolClassroomController.filteredClassrooms[index],
+                widget.selectedService.value,
+              ),
+            )),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Obx(() => TextField(
+        controller: _searchController,
+        focusNode: _searchFocusNode,
+        onChanged: (value) => widget.schoolClassroomController.searchClassrooms(value),
+        decoration: InputDecoration(
+          hintText: 'Search classrooms...',
+          hintStyle: GoogleFonts.poppins(
+            fontSize: 14,
+            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
+          ),
+          prefixIcon: const Icon(Icons.search, color: primaryColor, size: 20),
+          suffixIcon: widget.schoolClassroomController.searchQuery.value.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 20),
+                  onPressed: () {
+                    widget.schoolClassroomController.clearSearch();
+                    _searchController.clear();
+                    _searchFocusNode.unfocus();
+                  },
+                  tooltip: 'Clear search',
+                )
+              : null,
+          filled: true,
+          fillColor: Theme.of(context).colorScheme.background.withOpacity(0.3),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: primaryColor, width: 2),
+          ),
+        ),
+        style: GoogleFonts.poppins(fontSize: 14),
+      )),
     );
   }
 
   Widget _buildClassroomCard(Classrooms classroom, String service) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.only(bottom: 12.0),
       child: InkWell(
-        onTap: () => widget.onClassroomSelected(classroom),
+        onTap: () {
+          widget.onClassroomSelected(classroom);
+          // Clear search and close keyboard on selection
+          widget.schoolClassroomController.clearSearch();
+          _searchFocusNode.unfocus();
+        },
         borderRadius: BorderRadius.circular(12),
         splashColor: primaryColor.withOpacity(0.3),
         highlightColor: primaryColor.withOpacity(0.1),
@@ -1860,37 +1814,42 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline.withOpacity(0.15),
+              width: 1,
+            ),
             boxShadow: [
               BoxShadow(
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2)),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(14.0),
             child: Row(
               children: [
                 Container(
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.1),
-                      shape: BoxShape.circle),
+                    color: primaryColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
                   child: Center(
                     child: Text(
-                      classroom.name?.substring(0, 1) ?? 'C',
+                      classroom.name?.substring(0, 1).toUpperCase() ?? 'C',
                       style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: primaryColor),
-                      semanticsLabel:
-                          'Classroom ${classroom.name ?? 'Unknown'} initial',
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: primaryColor,
+                      ),
+                      semanticsLabel: 'Classroom ${classroom.name ?? 'Unknown'} initial',
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1898,24 +1857,36 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                       Text(
                         classroom.name ?? 'Unknown',
                         style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.onSurface),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
+                          height: 1.2,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tap to select',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.1),
-                      shape: BoxShape.circle),
-                  child: Icon(Icons.arrow_forward,
-                      size: 20,
-                      color: primaryColor,
-                      semanticLabel: 'Select classroom'),
+                    color: primaryColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward,
+                    size: 18,
+                    color: primaryColor,
+                    semanticLabel: 'Select classroom',
+                  ),
                 ),
               ],
             ),
@@ -1935,6 +1906,8 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
         return Icons.message_rounded;
       case 'fees':
         return Icons.account_balance_wallet_rounded;
+      case 'facial':
+        return Icons.face_rounded;
       default:
         return Icons.checklist_rounded;
     }
@@ -1968,19 +1941,22 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
             boxShadow: [
               BoxShadow(
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
-                  blurRadius: 15,
-                  spreadRadius: 5,
-                  offset: const Offset(0, -3))
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+                blurRadius: 15,
+                spreadRadius: 5,
+                offset: const Offset(0, -3),
+              ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Drag handle and close button
               Stack(
                 children: [
                   Center(
@@ -1990,11 +1966,9 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                         width: 50,
                         height: 5,
                         decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(10)),
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                   ),
@@ -2002,15 +1976,19 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                     right: 8,
                     top: 8,
                     child: IconButton(
-                      icon: Icon(Icons.close,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          semanticLabel: 'Close'),
+                      icon: Icon(
+                        Icons.close,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        semanticLabel: 'Close',
+                      ),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
+              
+              // Title with icon
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Row(
@@ -2018,32 +1996,48 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                          color: primaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12)),
+                        color: primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Obx(() => Icon(
-                          _getServiceIcon(widget.selectedService.value),
-                          color: primaryColor,
-                          size: 24,
-                          semanticLabel: 'Service icon')),
+                        _getServiceIcon(widget.selectedService.value),
+                        color: primaryColor,
+                        size: 24,
+                        semanticLabel: 'Service icon',
+                      )),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Obx(() => Text(
-                            _getBottomSheetTitle(widget.selectedService.value),
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Theme.of(context).colorScheme.onSurface,
-                              height: 1.3,
-                              letterSpacing: 0.2,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          )),
+                        _getBottomSheetTitle(widget.selectedService.value),
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.onSurface,
+                          height: 1.3,
+                          letterSpacing: 0.2,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      )),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
+              
+              // Search field - only show if there are classrooms
+              Obx(() {
+                if (widget.schoolClassroomController.classrooms.isEmpty && 
+                    !widget.schoolClassroomController.isLoading.value) {
+                  return const SizedBox.shrink();
+                }
+                return _buildSearchField();
+              }),
+              
+              const SizedBox(height: 8),
+              
+              // Classroom list
               _buildClassroomList(),
             ],
           ),
@@ -2052,7 +2046,6 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
     );
   }
 }
-
 class SingleStudentBottomSheet extends StatefulWidget {
   final RxString selectedService;
   final SchoolClassroomController schoolClassroomController;
@@ -2244,7 +2237,7 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet>
                   color: primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.person_search_rounded,
                   color: primaryColor,
                   size: 24,
@@ -2281,7 +2274,7 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet>
             fontWeight: FontWeight.w400,
           ),
           prefixIcon:
-              Icon(Icons.search, color: primaryColor, semanticLabel: 'Search'),
+              const Icon(Icons.search, color: primaryColor, semanticLabel: 'Search'),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   icon: Icon(Icons.clear,

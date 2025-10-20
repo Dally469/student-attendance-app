@@ -54,10 +54,7 @@ dependencies:
   firebase_storage: any
   image_picker: ^1.0.7
   file_picker: any
-  google_mlkit_face_detection: ^0.13.0
-  tflite_flutter: ^0.10.4
-  image: ^4.2.0
-  camera: ^0.10.5
+
 
 
 dev_dependencies:
