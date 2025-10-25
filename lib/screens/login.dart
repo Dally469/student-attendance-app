@@ -125,15 +125,12 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: whiteColor.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
+                         
                         child: Image.asset(
-                          'assets/images/logo-school.png',
+                          'assets/images/logo_school.png',
                           width: 80,
                           height: 80,
-                          color: whiteColor,
+                          
                         ),
                       ),
                       const SizedBox(height: 16),

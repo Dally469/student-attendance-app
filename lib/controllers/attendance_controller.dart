@@ -20,8 +20,10 @@ class AttendanceController extends GetxController {
   final Rx<AttendanceModel?> currentAttendance = Rx<AttendanceModel?>(null);
   final Rx<AttendanceModel?> existingAttendance = Rx<AttendanceModel?>(null);
   final Rx<CheckInModel?> checkInModel = Rx<CheckInModel?>(null);
-  final RxString lastCheckedInStudent = RxString('');
+  final RxString lastCheckedInStudentName = ''.obs;
+  final RxString lastCheckedInStudentCode = ''.obs;
   final RxInt checkInCount = RxInt(0);
+  final RxSet<String> checkedInStudents = <String>{}.obs;
 
   // Helper method to safely get attendance ID
   String getAttendanceId() {
@@ -32,6 +34,36 @@ class AttendanceController extends GetxController {
       return existingAttendance.value!.data!.id!;
     }
     return attendanceId.value;
+  }
+
+  // Load current checked-in students from attendance
+  Future<void> loadCurrentAttendanceStudents(String attendanceId) async {
+    try {
+      isLoading.value = true;
+      final attendance = await _attendanceService.getAttendanceById(attendanceId);
+      if (attendance.success == true && attendance.data != null) {
+        // Assuming attendance.data.toJson() has 'checkIns' list of maps with 'studentId' and 'checkOutTime'
+        final dataJson = attendance.data!.toJson();
+        final List<dynamic>? checkIns = dataJson['checkIns'];
+        if (checkIns != null) {
+          final checkedIn = <String>{};
+          for (var cin in checkIns) {
+            final studentId = cin['studentId'] as String?;
+            final checkOutTime = cin['checkOutTime'];
+            if (studentId != null && checkOutTime == null) {
+              checkedIn.add(studentId);
+            }
+          }
+          checkedInStudents.value = checkedIn;
+          checkInCount.value = checkedIn.length;
+          print('Loaded ${checkedIn.length} checked-in students');
+        }
+      }
+    } catch (e) {
+      print('Error loading current attendance students: $e');
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   // Check if today's attendance exists for a classroom
@@ -253,6 +285,7 @@ class AttendanceController extends GetxController {
         deviceIdentifier: deviceIdentifier,
         notes: notes,
         checkTime: checkTime,
+        autoCheckOutPrevious: false, // Manual handling
       );
       
       print('Check-in API Response: $result');
@@ -263,11 +296,13 @@ class AttendanceController extends GetxController {
       if (result.success == true) {
         checkInModel.value = result;
         successMessage.value = result.message ?? 'Check-in successful';
+        lastCheckedInStudentName.value = result.data?.studentName ?? '';
+        lastCheckedInStudentCode.value = result.data?.studentId ?? '';
+        checkedInStudents.add(studentId);
+        checkInCount.value++;
         await Future.delayed(const Duration(milliseconds: 300));
         
         print('Student check-in successful: ${successMessage.value}');
-        lastCheckedInStudent.value = studentId;
-        checkInCount.value++;
       } else {
         errorMessage.value = result.message ?? 'Failed to check in student';
         print('Student check-in failed: ${errorMessage.value}');
@@ -281,6 +316,56 @@ class AttendanceController extends GetxController {
     }
   }
 
+  // Function to check out a student
+  // Future<void> checkOutStudent({
+  //   required String studentId,
+  //   required String classroomId,
+  //   required String attendanceId,
+  //   String deviceType = 'MANUAL',
+  //   String? deviceIdentifier,
+  //   String? notes,
+  //   String? checkTime,
+  // }) async {
+  //   try {
+  //     isLoading.value = true;
+  //     errorMessage.value = '';
+  //     successMessage.value = '';
+      
+  //     print('Check-out attempt - StudentID: $studentId, ClassroomID: $classroomId, AttendanceID: $attendanceId');
+      
+  //     final result = await _attendanceService.checkOutStudent(
+  //       studentId,
+  //       classroomId,
+  //       attendanceId,
+  //       deviceType: deviceType,
+  //       deviceIdentifier: deviceIdentifier,
+  //       notes: notes,
+  //       checkTime: checkTime,
+  //     );
+      
+  //     print('Check-out API Response: $result');
+      
+  //     if (result.success == true) {
+  //       successMessage.value = result.message ?? 'Check-out successful';
+  //       lastCheckedInStudentName.value = '';
+  //       lastCheckedInStudentCode.value = '';
+  //       checkedInStudents.remove(studentId);
+  //       checkInCount.value--;
+  //       await Future.delayed(const Duration(milliseconds: 300));
+        
+  //       print('Student check-out successful: ${successMessage.value}');
+  //     } else {
+  //       errorMessage.value = result.message ?? 'Failed to check out student';
+  //       print('Student check-out failed: ${errorMessage.value}');
+  //     }
+  //   } catch (e) {
+  //     print('Exception in checkOutStudent: $e');
+  //     errorMessage.value = 'An error occurred during check-out: $e';
+  //     print('Error during student check-out: ${errorMessage.value}');
+  //   } finally {
+  //     isLoading.value = false;
+  //   }
+  // }
 
   
   // Function to sync offline check-ins
@@ -309,6 +394,10 @@ class AttendanceController extends GetxController {
     attendanceId.value = '';
     currentAttendance.value = null;
     existingAttendance.value = null;
+    checkedInStudents.clear();
+    checkInCount.value = 0;
+    lastCheckedInStudentName.value = '';
+    lastCheckedInStudentCode.value = '';
   }
 
   // Function to get attendance by ID
@@ -339,5 +428,9 @@ class AttendanceController extends GetxController {
     attendanceId.value = '';
     currentAttendance.value = null;
     existingAttendance.value = null;
+    checkedInStudents.clear();
+    checkInCount.value = 0;
+    lastCheckedInStudentName.value = '';
+    lastCheckedInStudentCode.value = '';
   }
 }

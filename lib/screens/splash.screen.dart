@@ -26,10 +26,13 @@ class Splash extends StatefulWidget {
 class _SplashState extends State<Splash> with TickerProviderStateMixin {
   late AnimationController _logoController;
   late AnimationController _textController;
+  late AnimationController _notifyController;
   late Animation<double> _logoScale;
   late Animation<double> _logoOpacity;
   late List<Animation<Offset>> _letterAnimations;
   late List<Animation<double>> _letterOpacities;
+  late Animation<double> _notifyOpacity;
+  late Animation<Offset> _notifySlide;
   late UserData user;
   String? jsonCheck, json, jsonToken, jsonRole;
 
@@ -48,6 +51,12 @@ class _SplashState extends State<Splash> with TickerProviderStateMixin {
     _textController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
+    );
+
+    // Notify animation controller
+    _notifyController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
     );
 
     // Logo animations
@@ -96,10 +105,30 @@ class _SplashState extends State<Splash> with TickerProviderStateMixin {
       ),
     );
 
+    // Notify animations
+    _notifyOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _notifyController,
+        curve: Curves.easeIn,
+      ),
+    );
+
+    _notifySlide = Tween<Offset>(
+      begin: const Offset(0, 20),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _notifyController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
     // Start animations
     _logoController.forward().then((_) {
       _textController.forward().whenComplete(() {
-        startTime();
+        _notifyController.forward().whenComplete(() {
+          startTime();
+        });
       });
     });
   }
@@ -107,31 +136,35 @@ class _SplashState extends State<Splash> with TickerProviderStateMixin {
   Future<Timer> startTime() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // Get all necessary data
       json = prefs.getString('currentUser');
       jsonToken = prefs.getString('token');
       jsonRole = prefs.getString('role');
-      
+
       debugPrint('Stored user data: $json');
       debugPrint('Stored token: $jsonToken');
       debugPrint('Stored role: $jsonRole');
 
-      var duration = const Duration(milliseconds: 2000); // Give consistent delay
+      var duration =
+          const Duration(milliseconds: 2000); // Give consistent delay
 
       // Check if user is logged in (has both user data and token)
-      if (json == null || json == 'no' || jsonToken == null || jsonToken == 'no') {
+      if (json == null ||
+          json == 'no' ||
+          jsonToken == null ||
+          jsonToken == 'no') {
         debugPrint('User not logged in - redirecting to login');
         jsonCheck = 'no';
       } else {
         debugPrint('User is logged in - checking role');
         jsonCheck = 'yes';
-        
+
         // Parse user data
         try {
           Map<String, dynamic> map = jsonDecode(json!);
           user = UserData.fromJson(map);
-          
+
           // If role is not stored separately, try to get it from user data
           if (jsonRole == null || jsonRole == 'no') {
             jsonRole = map['role'] ?? map['userRole'] ?? map['user_role'];
@@ -154,7 +187,7 @@ class _SplashState extends State<Splash> with TickerProviderStateMixin {
   void navigationPage() {
     try {
       debugPrint('Navigating... jsonCheck: $jsonCheck, jsonRole: $jsonRole');
-      
+
       if (jsonCheck == 'no') {
         debugPrint('Navigating to login');
         Get.offAllNamed('/login'); // Use offAllNamed to clear navigation stack
@@ -164,7 +197,7 @@ class _SplashState extends State<Splash> with TickerProviderStateMixin {
           String role = jsonRole!.toUpperCase(); // Ensure consistent case
           String newRole = role.replaceAll('"', '');
           debugPrint('User role (normalized): $newRole');
-          
+
           switch (newRole) {
             case "ADMIN":
               debugPrint('Navigating to schools (admin)');
@@ -194,6 +227,7 @@ class _SplashState extends State<Splash> with TickerProviderStateMixin {
   void dispose() {
     _logoController.dispose();
     _textController.dispose();
+    _notifyController.dispose();
     super.dispose();
   }
 
@@ -229,21 +263,19 @@ class _SplashState extends State<Splash> with TickerProviderStateMixin {
                           child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: whiteColor.withOpacity(0.1),
-                              shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Color.fromARGB(255, 2, 63, 59).withOpacity(0.2),
+                                  color: Color.fromARGB(255, 6, 145, 210)
+                                      .withOpacity(0.2),
                                   blurRadius: 20,
                                   spreadRadius: 5,
                                 ),
                               ],
                             ),
                             child: Image.asset(
-                              'assets/images/logo-school.png',
+                              'assets/images/logo_school.png',
                               width: 80,
                               height: 80,
-                              color: whiteColor,
                             ),
                           ),
                         ),
@@ -276,6 +308,33 @@ class _SplashState extends State<Splash> with TickerProviderStateMixin {
                                   ],
                                 ),
                               ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 0),
+                    // "NOTIFY" Text
+                    AnimatedBuilder(
+                      animation: _notifyController,
+                      builder: (context, child) => Transform.translate(
+                        offset: _notifySlide.value,
+                        child: Opacity(
+                          opacity: _notifyOpacity.value,
+                          child: Text(
+                            "Notify",
+                            style: GoogleFonts.poppins(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.yellow,
+                              letterSpacing: 4,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(2, 2),
+                                ),
+                              ],
                             ),
                           ),
                         ),

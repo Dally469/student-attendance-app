@@ -76,7 +76,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         visualDensity: VisualDensity.adaptivePlatformDensity,
-        primaryColor: const Color.fromARGB(255, 18, 170, 112),
+        primaryColor: Color.fromARGB(255, 0, 179, 250),
       ),
       initialRoute: showHome ? home : splash,
       getPages: AppNavigation.getPages, // Use GetX routes

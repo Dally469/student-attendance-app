@@ -394,89 +394,28 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
     );
   }
 
-void _showAttendanceConfigBottomSheet(BuildContext context, Classrooms classroomData) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    isDismissible: true,
-    enableDrag: true,
-    builder: (context) => AttendanceConfigBottomSheet(
-      classroom: classroomData,
-      onAttendanceReady: (String attendanceId) {
-        // Navigate to attendance screen with the attendance ID
-        Get.toNamed(makeAttendance, parameters: {
-          'classroomId': classroomData.id.toString(),
-          'classroom': classroomData.name.toString(),
-          'attendanceId': attendanceId,
-        });
-      },
-    ),
-  );
-}
-
-  void _createAttendanceWithConfig(
-      Classrooms classroomData, String mode, String deviceType) {
-    if (schoolId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('School ID not found. Please login again.'),
-            backgroundColor: Colors.red),
-      );
-      return;
-    }
-
-    isCreatingAttendance.value = true;
-    _attendanceController.createAttendance(
-      classroomData.id.toString(),
-      mode: mode,
-      deviceType: deviceType,
-      schoolId: schoolId!,
+  void _showAttendanceConfigBottomSheet(
+      BuildContext context, Classrooms classroomData) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: true,
+      enableDrag: true,
+      builder: (context) => AttendanceConfigBottomSheet(
+        classroom: classroomData,
+        onAttendanceReady: (String attendanceId) {
+          // Navigate to attendance screen with the attendance ID
+          Get.toNamed(makeAttendance, parameters: {
+            'classroomId': classroomData.id.toString(),
+            'classroom': classroomData.name.toString(),
+            'attendanceId': attendanceId,
+          });
+        },
+      ),
     );
-
-    late StreamSubscription successSubscription;
-    successSubscription = _attendanceController.successMessage.listen((message) {
-      if (message.isNotEmpty) {
-        Future.delayed(const Duration(milliseconds: 300), () {
-          String attendanceId =
-              _attendanceController.currentAttendance.value?.data?.id ??
-                  _attendanceController.attendanceId.value;
-          isCreatingAttendance.value = false;
-          successSubscription.cancel();
-          if (attendanceId.isNotEmpty && context.mounted) {
-            Get.toNamed(makeAttendance, parameters: {
-              'classroomId': classroomData.id.toString(),
-              'classroom': classroomData.name.toString(),
-              'attendanceId': attendanceId,
-            });
-          } else if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content:
-                      Text('Failed to get attendance ID. Please try again.'),
-                  backgroundColor: Colors.red),
-            );
-          }
-        });
-      }
-    });
-
-    late StreamSubscription errorSubscription;
-    errorSubscription =
-        _attendanceController.errorMessage.listen((errorMessage) {
-      if (errorMessage.isNotEmpty) {
-        Future.delayed(const Duration(milliseconds: 300), () {
-          isCreatingAttendance.value = false;
-          errorSubscription.cancel();
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
-            );
-          }
-        });
-      }
-    });
   }
+
 
   void _handleClassroomSelection(Classrooms classroomData,
       {FeesData? selectedFeeType}) {
@@ -571,7 +510,7 @@ void _showAttendanceConfigBottomSheet(BuildContext context, Classrooms classroom
           });
           break;
         case 'attendance':
-                _showAttendanceConfigBottomSheet(context, classroomData);
+          _showAttendanceConfigBottomSheet(context, classroomData);
           break;
         case 'communication':
           Get.toNamed(parentCommunication, parameters: {
@@ -1337,6 +1276,7 @@ void _showAttendanceConfigBottomSheet(BuildContext context, Classrooms classroom
   }
 
   @override
+
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: _onWillPop,
@@ -1481,9 +1421,9 @@ void _showAttendanceConfigBottomSheet(BuildContext context, Classrooms classroom
                   _buildServiceCard('Parent Communication',
                       'assets/images/chat.png', 'communication'),
                   const SizedBox(height: 16),
-                  _buildServiceCard('Manage School Fees',
-                      'assets/images/tuition-fees.png', 'fees',
-                      hasHistory: true, historyRoute: feeHistory),
+                  // _buildServiceCard('Manage School Fees',
+                  //     'assets/images/tuition-fees.png', 'fees',
+                  //     hasHistory: true, historyRoute: feeHistory),
                   const SizedBox(height: 16),
                   _buildServiceCard(
                       'SMS Top-up & Balance', 'assets/images/sms.png', 'sms',
@@ -1497,7 +1437,6 @@ void _showAttendanceConfigBottomSheet(BuildContext context, Classrooms classroom
     );
   }
 }
-
 
 class _ClassroomBottomSheet extends StatefulWidget {
   final RxString selectedService;
@@ -1531,7 +1470,7 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
 
     // Initialize search controller with current search query
     _searchController.text = widget.schoolClassroomController.searchQuery.value;
-    
+
     // Listen to controller's search query changes
     ever(widget.schoolClassroomController.searchQuery, (query) {
       if (_searchController.text != query) {
@@ -1558,17 +1497,17 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
       if (widget.schoolClassroomController.errorMessage.value.isNotEmpty) {
         return _buildEmptyState();
       }
-      
+
       // Use filtered classrooms instead of all classrooms
       if (widget.schoolClassroomController.filteredClassrooms.isNotEmpty) {
         return _buildClassroomListContent();
       }
-      
+
       // Show different empty state based on whether user is searching
       if (widget.schoolClassroomController.searchQuery.value.isNotEmpty) {
         return _buildNoSearchResultsState();
       }
-      
+
       return _buildEmptyState();
     });
   }
@@ -1630,7 +1569,8 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: () => widget.schoolClassroomController.getSchoolClassrooms(forceRefresh: true),
+              onPressed: () => widget.schoolClassroomController
+                  .getSchoolClassrooms(forceRefresh: true),
               icon: const Icon(Icons.refresh, size: 18),
               label: Text('Retry', style: GoogleFonts.poppins(fontSize: 14)),
               style: ElevatedButton.styleFrom(
@@ -1639,7 +1579,8 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
           ],
@@ -1673,13 +1614,13 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
               child: Obx(() => Text(
-                'No classrooms match "${widget.schoolClassroomController.searchQuery.value}"',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                textAlign: TextAlign.center,
-              )),
+                    'No classrooms match "${widget.schoolClassroomController.searchQuery.value}"',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  )),
             ),
             const SizedBox(height: 16),
             TextButton.icon(
@@ -1689,10 +1630,12 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                 _searchFocusNode.unfocus();
               },
               icon: const Icon(Icons.clear, size: 18),
-              label: Text('Clear search', style: GoogleFonts.poppins(fontSize: 14)),
+              label: Text('Clear search',
+                  style: GoogleFonts.poppins(fontSize: 14)),
               style: TextButton.styleFrom(
                 foregroundColor: primaryColor,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
           ],
@@ -1707,14 +1650,18 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
         children: [
           // Show result count
           Obx(() {
-            final filteredCount = widget.schoolClassroomController.filteredClassrooms.length;
-            final totalCount = widget.schoolClassroomController.classrooms.length;
-            final isSearching = widget.schoolClassroomController.searchQuery.value.isNotEmpty;
-            
+            final filteredCount =
+                widget.schoolClassroomController.filteredClassrooms.length;
+            final totalCount =
+                widget.schoolClassroomController.classrooms.length;
+            final isSearching =
+                widget.schoolClassroomController.searchQuery.value.isNotEmpty;
+
             if (!isSearching) return const SizedBox.shrink();
-            
+
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
                   Text(
@@ -1729,17 +1676,18 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
               ),
             );
           }),
-          
+
           // Classroom list
           Expanded(
             child: Obx(() => ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              itemCount: widget.schoolClassroomController.filteredClassrooms.length,
-              itemBuilder: (context, index) => _buildClassroomCard(
-                widget.schoolClassroomController.filteredClassrooms[index],
-                widget.selectedService.value,
-              ),
-            )),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  itemCount: widget
+                      .schoolClassroomController.filteredClassrooms.length,
+                  itemBuilder: (context, index) => _buildClassroomCard(
+                    widget.schoolClassroomController.filteredClassrooms[index],
+                    widget.selectedService.value,
+                  ),
+                )),
           ),
         ],
       ),
@@ -1750,48 +1698,56 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Obx(() => TextField(
-        controller: _searchController,
-        focusNode: _searchFocusNode,
-        onChanged: (value) => widget.schoolClassroomController.searchClassrooms(value),
-        decoration: InputDecoration(
-          hintText: 'Search classrooms...',
-          hintStyle: GoogleFonts.poppins(
-            fontSize: 14,
-            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
-          ),
-          prefixIcon: const Icon(Icons.search, color: primaryColor, size: 20),
-          suffixIcon: widget.schoolClassroomController.searchQuery.value.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, size: 20),
-                  onPressed: () {
-                    widget.schoolClassroomController.clearSearch();
-                    _searchController.clear();
-                    _searchFocusNode.unfocus();
-                  },
-                  tooltip: 'Clear search',
-                )
-              : null,
-          filled: true,
-          fillColor: Theme.of(context).colorScheme.background.withOpacity(0.3),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-              width: 1,
+            controller: _searchController,
+            focusNode: _searchFocusNode,
+            onChanged: (value) =>
+                widget.schoolClassroomController.searchClassrooms(value),
+            decoration: InputDecoration(
+              hintText: 'Search classrooms...',
+              hintStyle: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurfaceVariant
+                    .withOpacity(0.6),
+              ),
+              prefixIcon:
+                  const Icon(Icons.search, color: primaryColor, size: 20),
+              suffixIcon:
+                  widget.schoolClassroomController.searchQuery.value.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 20),
+                          onPressed: () {
+                            widget.schoolClassroomController.clearSearch();
+                            _searchController.clear();
+                            _searchFocusNode.unfocus();
+                          },
+                          tooltip: 'Clear search',
+                        )
+                      : null,
+              filled: true,
+              fillColor:
+                  Theme.of(context).colorScheme.background.withOpacity(0.3),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: primaryColor, width: 2),
+              ),
             ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: primaryColor, width: 2),
-          ),
-        ),
-        style: GoogleFonts.poppins(fontSize: 14),
-      )),
+            style: GoogleFonts.poppins(fontSize: 14),
+          )),
     );
   }
 
@@ -1820,7 +1776,8 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
             ),
             boxShadow: [
               BoxShadow(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
+                color:
+                    Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
                 blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
@@ -1845,7 +1802,8 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                         fontWeight: FontWeight.bold,
                         color: primaryColor,
                       ),
-                      semanticsLabel: 'Classroom ${classroom.name ?? 'Unknown'} initial',
+                      semanticsLabel:
+                          'Classroom ${classroom.name ?? 'Unknown'} initial',
                     ),
                   ),
                 ),
@@ -1865,12 +1823,53 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        'Tap to select',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: primaryColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              child: Text(
+                                '${classroom.statistics?.maleCount} Male',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant
+                                      .withOpacity(0.7),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: orangeColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              child: Text(
+                                '${classroom.statistics?.femaleCount} Female',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant
+                                      .withOpacity(0.7),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 60),
+                        ],
                       ),
                     ],
                   ),
@@ -1966,7 +1965,10 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                         width: 50,
                         height: 5,
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.2),
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -1987,7 +1989,7 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // Title with icon
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -2000,43 +2002,43 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Obx(() => Icon(
-                        _getServiceIcon(widget.selectedService.value),
-                        color: primaryColor,
-                        size: 24,
-                        semanticLabel: 'Service icon',
-                      )),
+                            _getServiceIcon(widget.selectedService.value),
+                            color: primaryColor,
+                            size: 24,
+                            semanticLabel: 'Service icon',
+                          )),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Obx(() => Text(
-                        _getBottomSheetTitle(widget.selectedService.value),
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).colorScheme.onSurface,
-                          height: 1.3,
-                          letterSpacing: 0.2,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 2,
-                      )),
+                            _getBottomSheetTitle(widget.selectedService.value),
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Theme.of(context).colorScheme.onSurface,
+                              height: 1.3,
+                              letterSpacing: 0.2,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          )),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               // Search field - only show if there are classrooms
               Obx(() {
-                if (widget.schoolClassroomController.classrooms.isEmpty && 
+                if (widget.schoolClassroomController.classrooms.isEmpty &&
                     !widget.schoolClassroomController.isLoading.value) {
                   return const SizedBox.shrink();
                 }
                 return _buildSearchField();
               }),
-              
+
               const SizedBox(height: 8),
-              
+
               // Classroom list
               _buildClassroomList(),
             ],
@@ -2046,6 +2048,7 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
     );
   }
 }
+
 class SingleStudentBottomSheet extends StatefulWidget {
   final RxString selectedService;
   final SchoolClassroomController schoolClassroomController;
@@ -2273,8 +2276,8 @@ class _SingleStudentBottomSheetState extends State<SingleStudentBottomSheet>
             color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w400,
           ),
-          prefixIcon:
-              const Icon(Icons.search, color: primaryColor, semanticLabel: 'Search'),
+          prefixIcon: const Icon(Icons.search,
+              color: primaryColor, semanticLabel: 'Search'),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   icon: Icon(Icons.clear,

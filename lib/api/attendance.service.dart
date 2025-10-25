@@ -283,6 +283,58 @@ class AttendanceService {
     }
   }
 
+  // Get attendance by ID
+  Future<AttendanceModel> getAttendanceById(String attendanceId) async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('token');
+
+      if (token == null) {
+        return AttendanceModel(
+          success: false,
+          status: 401,
+          message: 'Authentication token not found',
+        );
+      }
+
+      Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': token,
+      };
+
+      final uri = Uri.parse('${dotenv.get('mainUrl')}/api/attendance/$attendanceId');
+
+      print('=== GET Attendance by ID Request ===');
+      print('URL: $uri');
+      print('Headers: $headers');
+
+      var response = await http.get(uri, headers: headers);
+
+      print('Response Status: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+      print('====================================');
+
+      if (response.statusCode == 200) {
+        Map<String, dynamic> results = jsonDecode(response.body);
+        return AttendanceModel.fromJson(results);
+      } else {
+        Map<String, dynamic> errorResults = jsonDecode(response.body);
+        return AttendanceModel(
+          success: false,
+          status: response.statusCode,
+          message: errorResults['message'] ?? 'Failed to fetch attendance',
+        );
+      }
+    } catch (e) {
+      print('Error in getAttendanceById: $e');
+      return AttendanceModel(
+        success: false,
+        status: 500,
+        message: 'Error: ${e.toString()}',
+      );
+    }
+  }
+
   /// Checks if the classroom has attendance records for the specified date.
   /// Date must be in YYYY-MM-DD format. Mode and deviceType are optional.
   Future<AttendanceModel> getAttendanceByClassroomDate(

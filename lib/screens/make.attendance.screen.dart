@@ -63,6 +63,11 @@ class _AttendancePageState extends State<AttendancePage> with SingleTickerProvid
     // Validate required parameters
     _validateAndRedirectIfNeeded();
     
+    // Load current checked-in students
+    if (widget.attendanceId != null && widget.attendanceId!.isNotEmpty) {
+      _attendanceController.loadCurrentAttendanceStudents(widget.attendanceId!);
+    }
+    
     // Initialize NFC
     checkNfcAvailability();
     
@@ -87,17 +92,15 @@ class _AttendancePageState extends State<AttendancePage> with SingleTickerProvid
         // Wait a moment to ensure UI is stable
         Future.delayed(const Duration(milliseconds: 300), () {
           if (mounted) {
+            final title = message.toLowerCase().contains('check-out') ? 'Checked Out' : 'Success';
             Get.snackbar(
-              'Success',
+              title,
               message,
-              backgroundColor: Colors.green,
+              backgroundColor: message.toLowerCase().contains('check-out') ? Colors.orange : Colors.green,
               colorText: Colors.white,
               snackPosition: SnackPosition.BOTTOM,
               duration: const Duration(seconds: 2),
             );
-            
-            // Increment check-in counter
-            _attendanceController.checkInCount.value++;
           }
         });
       }
@@ -123,10 +126,10 @@ class _AttendancePageState extends State<AttendancePage> with SingleTickerProvid
     });
     
     // Listen for last checked-in student to update UI
-    ever(_attendanceController.lastCheckedInStudent, (studentId) {
-      if (studentId.isNotEmpty) {
+    ever(_attendanceController.lastCheckedInStudentName, (name) {
+      if (name.isNotEmpty) {
         // Update UI or perform any actions when a student is checked in
-        print('Student checked in: $studentId');
+        print('Student checked in: $name');
       }
     });
   }
@@ -238,17 +241,35 @@ class _AttendancePageState extends State<AttendancePage> with SingleTickerProvid
               if (studentId != null) {
                 print('Found student with ID: $studentId');
                 
-                // Process the check-in with the controller
-                await _attendanceController.checkInStudent(
-                  studentId: studentId,
-                  classroomId: widget.classroomId.toString(),
-                  attendanceId: widget.attendanceId.toString(),
-                );
+                // Check if already checked in
+                final alreadyCheckedIn = _attendanceController.checkedInStudents.contains(studentId);
+                
+                if (alreadyCheckedIn) {
+                  // Perform check-out
+                  // await _attendanceController.checkOutStudent(
+                  //   studentId: studentId,
+                  //   classroomId: widget.classroomId.toString(),
+                  //   attendanceId: widget.attendanceId.toString(),
+                  // );
+
+                    await _attendanceController.checkInStudent(
+                    studentId: studentId,
+                    classroomId: widget.classroomId.toString(),
+                    attendanceId: widget.attendanceId.toString(),
+                  );
+                } else {
+                  // Perform check-in
+                  await _attendanceController.checkInStudent(
+                    studentId: studentId,
+                    classroomId: widget.classroomId.toString(),
+                    attendanceId: widget.attendanceId.toString(),
+                  );
+                }
                 
                 // Temporarily stop the session to give feedback
                 await NfcManager.instance.stopSession();
                 
-                // Vibrate to give tactile feedback for successful scan
+                // Vibrate to give tactile feedback
                 HapticFeedback.mediumImpact();
                 
                 // Give the system a short break to process and show feedback
@@ -600,8 +621,9 @@ class _AttendancePageState extends State<AttendancePage> with SingleTickerProvid
               
               // Last scanned student card
               Obx(() {
-                final lastStudent = _attendanceController.lastCheckedInStudent.value;
-                if (lastStudent.isEmpty) {
+                final lastName = _attendanceController.lastCheckedInStudentName.value;
+                final lastCode = _attendanceController.lastCheckedInStudentCode.value;
+                if (lastName.isEmpty) {
                   return const SizedBox(height: 100);
                 }
                 
@@ -622,8 +644,8 @@ class _AttendancePageState extends State<AttendancePage> with SingleTickerProvid
                             radius: 30,
                             backgroundColor: theme.colorScheme.primary,
                             child: Text(
-                              lastStudent.isNotEmpty 
-                                ? lastStudent.substring(0, 1).toUpperCase()
+                              lastName.isNotEmpty 
+                                ? lastName.substring(0, 1).toUpperCase()
                                 : "?",
                               style: GoogleFonts.poppins(
                                 fontSize: 24,
@@ -646,7 +668,7 @@ class _AttendancePageState extends State<AttendancePage> with SingleTickerProvid
                                   ),
                                 ),
                                 Text(
-                                  lastStudent,
+                                  lastName,
                                   style: GoogleFonts.poppins(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w600,
@@ -655,6 +677,15 @@ class _AttendancePageState extends State<AttendancePage> with SingleTickerProvid
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                                const SizedBox(height: 4),
+                                // Text(
+                                //   'Code: $lastCode',
+                                //   style: GoogleFonts.poppins(
+                                //     fontSize: 14,
+                                //     color: Colors.black54,
+                                //     fontWeight: FontWeight.w500,
+                                //   ),
+                                // ),
                               ],
                             ),
                           ),
