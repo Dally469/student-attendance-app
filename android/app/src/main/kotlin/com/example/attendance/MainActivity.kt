@@ -1,4 +1,4 @@
-package com.besoft.schoolnotify
+package com.besoft.eBridgeSchool
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -125,17 +125,15 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(16),
-                         
                         child: Image.asset(
                           'assets/images/logo_school.png',
                           width: 80,
                           height: 80,
-                          
                         ),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'SchoolNotify',
+                        'eBridgeSchool',
                         style: GoogleFonts.poppins(
                           fontSize: 32,
                           fontWeight: FontWeight.w700,

@@ -1355,37 +1355,37 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 8),
-                            StreamBuilder<ConnectivityResult>(
-                              stream: Connectivity().onConnectivityChanged,
-                              builder: (context, snapshot) {
-                                final isOnline =
-                                    snapshot.data != ConnectivityResult.none;
-                                isConnected.value = isOnline;
-                                return Row(
-                                  children: [
-                                    Icon(
-                                      isOnline ? Icons.wifi : Icons.wifi_off,
-                                      color: isOnline
-                                          ? primaryColor
-                                          : Colors.orange,
-                                      size: 16,
-                                      semanticLabel:
-                                          isOnline ? 'Online' : 'Offline',
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      isOnline ? 'Online' : 'Offline',
-                                      style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          color: isOnline
-                                              ? primaryColor
-                                              : Colors.orange),
-                                    ),
-                                  ],
-                                );
-                              },
-                              initialData: ConnectivityResult.none,
-                            ),
+                            // StreamBuilder<ConnectivityResult>(
+                            //   stream: Connectivity().onConnectivityChanged,
+                            //   builder: (context, snapshot) {
+                            //     final isOnline =
+                            //         snapshot.data != ConnectivityResult.none;
+                            //     isConnected.value = isOnline;
+                            //     return Row(
+                            //       children: [
+                            //         Icon(
+                            //           isOnline ? Icons.wifi : Icons.wifi_off,
+                            //           color: isOnline
+                            //               ? primaryColor
+                            //               : Colors.orange,
+                            //           size: 16,
+                            //           semanticLabel:
+                            //               isOnline ? 'Online' : 'Offline',
+                            //         ),
+                            //         const SizedBox(width: 8),
+                            //         Text(
+                            //           isOnline ? 'Online' : 'Offline',
+                            //           style: GoogleFonts.poppins(
+                            //               fontSize: 14,
+                            //               color: isOnline
+                            //                   ? primaryColor
+                            //                   : Colors.orange),
+                            //         ),
+                            //       ],
+                            //     );
+                            //   },
+                            //   initialData: ConnectivityResult.none,
+                            // ),
                           ],
                         ),
                       ),
