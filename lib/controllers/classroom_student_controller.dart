@@ -17,9 +17,9 @@ class ClassroomStudentController extends GetxController {
 
   // Helper method to check if student has card
   bool hasCard(StudentData student) {
-    return student.cardId != null && 
-           student.cardId!.isNotEmpty && 
-           student.cardId != "null";
+    return student.cardId != null &&
+        student.cardId!.isNotEmpty &&
+        student.cardId != "null";
   }
 
   // Get count of students with cards
@@ -38,7 +38,8 @@ class ClassroomStudentController extends GetxController {
   }
 
   // Function to fetch students by classroom ID
-  Future<void> getStudentsByClassroomId(String classroom, {bool forceRefresh = false}) async {
+  Future<void> getStudentsByClassroomId(String classroom,
+      {bool forceRefresh = false}) async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
@@ -47,16 +48,20 @@ class ClassroomStudentController extends GetxController {
       if (result.success!) {
         students.assignAll(result.data ?? []);
         // Sort students alphabetically by name
-        students.sort((a, b) => 
-          (a.name ?? '').toLowerCase().compareTo((b.name ?? '').toLowerCase())
-        );
+        students.sort((a, b) => (a.name ?? '')
+            .toLowerCase()
+            .compareTo((b.name ?? '').toLowerCase()));
       } else {
         errorMessage.value = result.message ?? 'Failed to fetch students';
       }
     } catch (e) {
       errorMessage.value = 'An error occurred while fetching students: $e';
     } finally {
-      isLoading.value = false;
+      // Defer isLoading update to avoid build phase conflicts
+      // This ensures the update happens after the current build phase completes
+      Future.microtask(() {
+        isLoading.value = false;
+      });
     }
   }
 
@@ -68,11 +73,11 @@ class ClassroomStudentController extends GetxController {
       final updatedStudent = students[index];
       updatedStudent.cardId = cardId;
       updatedStudent.isCardAvailable = true;
-      
+
       // Update the student in the list
       students[index] = updatedStudent;
       students.refresh();
-      
+
       // Update filtered list
       _updateFilteredList();
     }
@@ -85,10 +90,10 @@ class ClassroomStudentController extends GetxController {
       final updatedStudent = students[index];
       updatedStudent.cardId = null;
       updatedStudent.isCardAvailable = false;
-      
+
       students[index] = updatedStudent;
       students.refresh();
-      
+
       _updateFilteredList();
     }
   }
@@ -105,33 +110,36 @@ class ClassroomStudentController extends GetxController {
 
   // Update filtered list based on search and filter
   void _updateFilteredList() {
-    List<StudentData> tempList = [];
+    // Defer the update to avoid calling setState during build
+    Future.microtask(() {
+      List<StudentData> tempList = [];
 
-    // Apply filter first
-    switch (currentFilter.value) {
-      case 'assigned':
-        tempList = students.where((s) => hasCard(s)).toList();
-        break;
-      case 'unassigned':
-        tempList = students.where((s) => !hasCard(s)).toList();
-        break;
-      case 'all':
-      default:
-        tempList = students.toList();
-        break;
-    }
+      // Apply filter first
+      switch (currentFilter.value) {
+        case 'assigned':
+          tempList = students.where((s) => hasCard(s)).toList();
+          break;
+        case 'unassigned':
+          tempList = students.where((s) => !hasCard(s)).toList();
+          break;
+        case 'all':
+        default:
+          tempList = students.toList();
+          break;
+      }
 
-    // Apply search if query is not empty
-    if (searchQuery.value.isNotEmpty) {
-      final query = searchQuery.value.toLowerCase();
-      tempList = tempList.where((student) {
-        final name = (student.name ?? '').toLowerCase();
-        final code = (student.code ?? '').toLowerCase();
-        return name.contains(query) || code.contains(query);
-      }).toList();
-    }
+      // Apply search if query is not empty
+      if (searchQuery.value.isNotEmpty) {
+        final query = searchQuery.value.toLowerCase();
+        tempList = tempList.where((student) {
+          final name = (student.name ?? '').toLowerCase();
+          final code = (student.code ?? '').toLowerCase();
+          return name.contains(query) || code.contains(query);
+        }).toList();
+      }
 
-    filteredStudents.assignAll(tempList);
+      filteredStudents.assignAll(tempList);
+    });
   }
 
   // Clear search
@@ -179,21 +187,20 @@ class ClassroomStudentController extends GetxController {
   }
 
   // Function to get student by card ID
-  Future<StudentData?> getStudentByCardId(String classroom, String cardId) async {
+  Future<StudentData?> getStudentByCardId(
+      String classroom, String cardId) async {
     try {
       if (students.isNotEmpty) {
-        final student = students.firstWhereOrNull((student) => 
-          student.cardId == cardId && student.cardId != null
-        );
+        final student = students.firstWhereOrNull(
+            (student) => student.cardId == cardId && student.cardId != null);
         if (student != null) {
           return student;
         }
       }
 
       await getStudentsByClassroomId(classroom);
-      return students.firstWhereOrNull((student) => 
-        student.cardId == cardId && student.cardId != null
-      );
+      return students.firstWhereOrNull(
+          (student) => student.cardId == cardId && student.cardId != null);
     } catch (e) {
       errorMessage.value = 'Error finding student by card ID: $e';
       return null;
@@ -212,11 +219,10 @@ class ClassroomStudentController extends GetxController {
 
   // Function to check if a student exists by card ID
   bool hasStudentWithCardId(String cardId) {
-    return students.any((student) => 
-      student.cardId == cardId && 
-      student.cardId != null && 
-      student.cardId!.isNotEmpty
-    );
+    return students.any((student) =>
+        student.cardId == cardId &&
+        student.cardId != null &&
+        student.cardId!.isNotEmpty);
   }
 
   // Function to reset the controller

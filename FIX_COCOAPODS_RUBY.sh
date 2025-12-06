@@ -45,3 +45,4 @@ echo "🎉 Setup complete! Restart your IDE and try running the app again."
 
 
 
+

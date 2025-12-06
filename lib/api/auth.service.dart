@@ -328,13 +328,41 @@ class AuthService {
     required String schoolId,
   }) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
-    String? token = sharedPreferences.getString("token") ?? "";
+    String? token = sharedPreferences.getString("token");
 
-    var newToken = token.replaceAll('"', "");
-    _setHeaders() => {
+    if (token == null || token.isEmpty) {
+      return AttendanceModel(
+        status: 401,
+        success: false,
+        message: 'Authentication token not found',
+        data: null,
+      );
+    }
+
+    // Clean token - remove JSON encoding quotes and decode if needed
+    String cleanToken = token.replaceAll('"', '').trim();
+
+    // Try to decode if it's still JSON-encoded
+    try {
+      if (cleanToken.startsWith('{') || cleanToken.startsWith('[')) {
+        var decoded = jsonDecode(cleanToken);
+        if (decoded is String) {
+          cleanToken = decoded;
+        }
+      }
+    } catch (e) {
+      // If decoding fails, use the cleaned token as is
+      debugPrint('Token decode attempt failed, using cleaned token: $e');
+    }
+
+    // Debug: Log token info (first 20 chars only for security)
+    debugPrint(
+        'Token length: ${cleanToken.length}, starts with: ${cleanToken.length > 20 ? cleanToken.substring(0, 20) : cleanToken}...');
+
+    Map<String, String> _setHeaders() => {
           'Content-type': 'application/json',
           'Accept': 'application/json',
-          'Authorization': newToken
+          'Authorization': cleanToken
         };
 
     // Prepare request body
@@ -377,10 +405,14 @@ class AuthService {
 
   // Pay student fee via MoPay (for parents)
   Future<Map<String, dynamic>> payStudentFee({
-    required String feeId,
+    required String studentFeeId,
     required String studentCode,
+    required String studentName,
+    required String feeTypeName,
     required String payerPhone,
-    required double amount,
+    required String schoolMomoPhone,
+    required double totalAmount,
+    required double feeAmount,
   }) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     String? parentToken = sharedPreferences.getString('parentToken');
@@ -400,32 +432,82 @@ class AuthService {
 
     final url = ApiEndpoints.payStudentFee;
 
-    // Format phone number to 12 digits (remove non-digits, ensure country code)
-    String formattedPhone = payerPhone.replaceAll(RegExp(r'[^\d]'), '');
+    // Format payer phone number to 12 digits
+    String formattedPayerPhone = payerPhone.replaceAll(RegExp(r'[^\d]'), '');
+
+    // Remove duplicate 250 prefix if present (e.g., "250250784638201" -> "250784638201")
+    if (formattedPayerPhone.startsWith('250250')) {
+      formattedPayerPhone = formattedPayerPhone.substring(3);
+    }
 
     // If phone starts with 0, replace with 250 (Rwanda country code)
-    if (formattedPhone.startsWith('0')) {
-      formattedPhone = '250${formattedPhone.substring(1)}';
+    if (formattedPayerPhone.startsWith('0')) {
+      formattedPayerPhone = '250${formattedPayerPhone.substring(1)}';
     }
-    // If phone doesn't start with 250, add it
-    else if (!formattedPhone.startsWith('250')) {
-      formattedPhone = '250$formattedPhone';
+    // If phone doesn't start with 250 and is 9 digits, add 250
+    else if (!formattedPayerPhone.startsWith('250') &&
+        formattedPayerPhone.length == 9) {
+      formattedPayerPhone = '250$formattedPayerPhone';
+    }
+    // If phone already starts with 250 and is 12 digits, use as is
+    else if (formattedPayerPhone.startsWith('250') &&
+        formattedPayerPhone.length == 12) {
+      // Already formatted correctly
     }
 
-    // Ensure it's exactly 12 digits
-    if (formattedPhone.length != 12) {
+    // Ensure payer phone is exactly 12 digits
+    if (formattedPayerPhone.length != 12) {
       return {
         'success': false,
-        'message': 'Invalid phone number format. Phone must be 12 digits.',
+        'message':
+            'Invalid payer phone number format. Phone must be 12 digits. Got: ${formattedPayerPhone.length} digits ($formattedPayerPhone)',
         'data': null,
       };
     }
 
+    // Format school MoMo phone number
+    String formattedSchoolMomo =
+        schoolMomoPhone.replaceAll(RegExp(r'[^\d]'), '');
+
+    // Remove duplicate 250 if present
+    if (formattedSchoolMomo.startsWith('250250')) {
+      formattedSchoolMomo = formattedSchoolMomo.substring(3);
+    }
+
+    if (formattedSchoolMomo.startsWith('0')) {
+      formattedSchoolMomo = '250${formattedSchoolMomo.substring(1)}';
+    } else if (!formattedSchoolMomo.startsWith('250') &&
+        formattedSchoolMomo.length == 9) {
+      formattedSchoolMomo = '250$formattedSchoolMomo';
+    }
+    // If already formatted correctly, use as is
+    else if (formattedSchoolMomo.startsWith('250') &&
+        formattedSchoolMomo.length == 12) {
+      // Already formatted correctly
+    }
+
+    // Ensure school MoMo phone is exactly 12 digits
+    if (formattedSchoolMomo.length != 12) {
+      return {
+        'success': false,
+        'message':
+            'Invalid school MoMo phone number format. Phone must be 12 digits. Got: ${formattedSchoolMomo.length} digits ($formattedSchoolMomo)',
+        'data': null,
+      };
+    }
+
+    // Build request body with new structure
     final requestBody = {
-      'feeId': feeId,
-      'studentCode': studentCode,
-      'payerPhone': formattedPhone,
-      'amount': amount,
+      'studentFeeId': studentFeeId,
+      'payerPhone': formattedPayerPhone,
+      'amount': totalAmount,
+      'transfers': [
+        {
+          'amount': feeAmount,
+          'phone': formattedSchoolMomo,
+          'message': '$studentName - $feeTypeName payment',
+        }
+      ],
     };
 
     debugPrint('=== POST Pay Student Fee Request ===');
@@ -469,7 +551,55 @@ class AuthService {
     }
   }
 
-  // Check payment status
+  // Sync fee payment status (public endpoint)
+  Future<Map<String, dynamic>> syncFeePayment(String transactionId) async {
+    Map<String, String> headers = {
+      'Content-Type': 'application/json',
+    };
+
+    final url = ApiEndpoints.syncFeePayment(transactionId);
+
+    debugPrint('=== POST Sync Fee Payment Request ===');
+    debugPrint('URL: $url');
+    debugPrint('Headers: $headers');
+    debugPrint('Transaction ID: $transactionId');
+
+    try {
+      var response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+      );
+
+      debugPrint('Response Status: ${response.statusCode}');
+      debugPrint('Response Body: ${response.body}');
+      debugPrint('===================================');
+
+      Map<String, dynamic> results = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'success': true,
+          'data': results,
+          'message': results['message'] ?? 'Payment status synced successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': results['message'] ?? 'Failed to sync payment status',
+          'data': results,
+        };
+      }
+    } catch (e) {
+      debugPrint('Error syncing fee payment: $e');
+      return {
+        'success': false,
+        'message': 'An error occurred: $e',
+        'data': null,
+      };
+    }
+  }
+
+  // Check payment status (GET method)
   Future<Map<String, dynamic>> checkPaymentStatus(String transactionId) async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     String? parentToken = sharedPreferences.getString('parentToken');
@@ -492,6 +622,7 @@ class AuthService {
     debugPrint('=== GET Payment Status Request ===');
     debugPrint('URL: $url');
     debugPrint('Headers: $headers');
+    debugPrint('Transaction ID: $transactionId');
 
     try {
       var response = await http.get(
@@ -508,7 +639,7 @@ class AuthService {
       if (response.statusCode == 200) {
         return {
           'success': true,
-          'data': results,
+          'data': results['data'],
           'message': results['message'] ?? 'Payment status retrieved',
         };
       } else {
@@ -520,6 +651,128 @@ class AuthService {
       }
     } catch (e) {
       debugPrint('Error checking payment status: $e');
+      return {
+        'success': false,
+        'message': 'An error occurred: $e',
+        'data': null,
+      };
+    }
+  }
+
+  // Update fee after successful payment
+  Future<Map<String, dynamic>> updateFee(String transactionId) async {
+    SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
+    String? parentToken = sharedPreferences.getString('parentToken');
+
+    if (parentToken == null || parentToken.isEmpty) {
+      return {
+        'success': false,
+        'message': 'Authentication token not found',
+        'data': null,
+      };
+    }
+
+    Map<String, String> headers = {
+      'Content-Type': 'application/json',
+      'Authorization': parentToken.replaceAll('"', ''),
+    };
+
+    final url = ApiEndpoints.updateFee(transactionId);
+
+    debugPrint('=== POST Update Fee Request ===');
+    debugPrint('URL: $url');
+    debugPrint('Headers: $headers');
+    debugPrint('Transaction ID: $transactionId');
+
+    try {
+      var response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+      );
+
+      debugPrint('Response Status: ${response.statusCode}');
+      debugPrint('Response Body: ${response.body}');
+      debugPrint('===================================');
+
+      Map<String, dynamic> results = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'success': true,
+          'data': results,
+          'message': results['message'] ?? 'Fee updated successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': results['message'] ?? 'Failed to update fee',
+          'data': results,
+        };
+      }
+    } catch (e) {
+      debugPrint('Error updating fee: $e');
+      return {
+        'success': false,
+        'message': 'An error occurred: $e',
+        'data': null,
+      };
+    }
+  }
+
+  // Fetch student fees by student ID
+  Future<Map<String, dynamic>> fetchStudentFeesByStudentId(
+      String studentId) async {
+    SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
+    String? parentToken = sharedPreferences.getString('parentToken');
+
+    if (parentToken == null || parentToken.isEmpty) {
+      return {
+        'success': false,
+        'message': 'Authentication token not found',
+        'data': null,
+      };
+    }
+
+    Map<String, String> headers = {
+      'Content-Type': 'application/json',
+      'Authorization': parentToken.replaceAll('"', ''),
+    };
+
+    final url = ApiEndpoints.getStudentFees(studentId);
+
+    debugPrint('=== GET Student Fees Request ===');
+    debugPrint('URL: $url');
+    debugPrint('Headers: $headers');
+    debugPrint('Student ID: $studentId');
+
+    try {
+      var response = await http.get(
+        Uri.parse(url),
+        headers: headers,
+      );
+
+      debugPrint('Response Status: ${response.statusCode}');
+      debugPrint('Response Body: ${response.body}');
+      debugPrint('===================================');
+
+      Map<String, dynamic> results = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'data': results['data'] ?? [],
+          'message':
+              results['message'] ?? 'Student fees retrieved successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': results['message'] ?? 'Failed to fetch student fees',
+          'data': null,
+        };
+      }
+    } catch (e) {
+      debugPrint('Error fetching student fees: $e');
       return {
         'success': false,
         'message': 'An error occurred: $e',

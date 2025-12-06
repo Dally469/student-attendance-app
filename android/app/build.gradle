@@ -34,7 +34,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace "com.besoft.eBridgeSchool"
-    compileSdkVersion 34
+    compileSdk 35
     ndkVersion flutter.ndkVersion
 
     compileOptions {

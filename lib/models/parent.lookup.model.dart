@@ -91,8 +91,18 @@ class StudentWithFees {
       {this.student, this.unpaidFees, this.feeSummary, this.hasUnpaidFees});
 
   StudentWithFees.fromJson(Map<String, dynamic> json) {
-    student =
-        json['student'] != null ? StudentData.fromJson(json['student']) : null;
+    // Handle both nested structure (with 'student' key) and flat structure (student fields directly)
+    if (json['student'] != null) {
+      // Nested structure: student data is under 'student' key
+      student = StudentData.fromJson(json['student']);
+    } else {
+      // Flat structure: student fields are directly in the JSON object
+      // Check if this looks like a student object (has 'id', 'code', 'name', etc.)
+      if (json['id'] != null || json['code'] != null || json['name'] != null) {
+        student = StudentData.fromJson(json);
+      }
+    }
+    
     if (json['unpaidFees'] != null) {
       unpaidFees = <StudentFee>[];
       json['unpaidFees'].forEach((v) {

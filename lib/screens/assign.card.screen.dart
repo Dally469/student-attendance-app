@@ -418,12 +418,13 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
       return ListView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
+        cacheExtent: 500, // Cache more items for smoother scrolling
         itemCount: studentsToShow.length,
         itemBuilder: (context, index) {
           final student = studentsToShow[index];
           final hasCard = _studentController.hasCard(student);
 
-          return _buildStudentCard(student, hasCard);
+          return _buildStudentCard(student, hasCard, index);
         },
       );
     });
@@ -462,8 +463,9 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
     );
   }
 
-  Widget _buildStudentCard(StudentData student, bool hasCard) {
+  Widget _buildStudentCard(StudentData student, bool hasCard, int index) {
     return Container(
+      key: ValueKey('student_${student.id}_$index'),
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -496,19 +498,55 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
         child: Row(
           children: [
             // Avatar
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: primaryColor.withOpacity(0.1),
-              backgroundImage: student.profileImage != null && 
-                               student.profileImage!.isNotEmpty &&
-                               student.profileImage != 'null'
-                  ? NetworkImage(student.profileImage!)
-                  : null,
-              child: student.profileImage == null || 
-                     student.profileImage!.isEmpty ||
-                     student.profileImage == 'null'
-                  ? const Icon(Icons.person, color: primaryColor, size: 28)
-                  : null,
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryColor.withOpacity(0.1),
+              ),
+              child: student.profileImage != null && 
+                     student.profileImage!.isNotEmpty &&
+                     student.profileImage != 'null'
+                  ? ClipOval(
+                      child: Image.network(
+                        student.profileImage!,
+                        fit: BoxFit.cover,
+                        width: 56,
+                        height: 56,
+                        cacheWidth: 112, // Cache at 2x for retina displays
+                        cacheHeight: 112,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(Icons.person, color: primaryColor, size: 28);
+                        },
+                        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                          if (wasSynchronouslyLoaded) return child;
+                          return AnimatedOpacity(
+                            opacity: frame == null ? 0 : 1,
+                            duration: const Duration(milliseconds: 200),
+                            child: child,
+                          );
+                        },
+                      ),
+                    )
+                  : const Icon(Icons.person, color: primaryColor, size: 28),
             ),
             const SizedBox(width: 14),
             
@@ -524,6 +562,8 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
                       fontWeight: FontWeight.w600,
                       color: primaryColor,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -533,6 +573,8 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
                       fontWeight: FontWeight.w400,
                       color: Colors.grey.shade700,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
                   

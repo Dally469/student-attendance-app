@@ -44,6 +44,8 @@ class StudentData {
   String? profileImage;
   String? schoolId;
   String? school;
+  String? schoolPhone;
+  String? accountMomoPhone;
   String? status;
   String? cardId;
   bool? isCardAvailable;
@@ -69,6 +71,8 @@ class StudentData {
       this.profileImage,
       this.schoolId,
       this.school,
+      this.schoolPhone,
+      this.accountMomoPhone,
       this.status,
       this.cardId,
       this.isCardAvailable,
@@ -94,6 +98,8 @@ class StudentData {
     profileImage = json['profileImage'];
     schoolId = json['schoolId'];
     school = json['school'];
+    schoolPhone = json['schoolPhone'];
+    accountMomoPhone = json['accountMomoPhone'];
     status = json['status'];
     cardId = json['cardId'];
     isCardAvailable = json['isCardAvailable'];
@@ -121,6 +127,8 @@ class StudentData {
     data['profileImage'] = profileImage;
     data['schoolId'] = schoolId;
     data['school'] = school;
+    data['schoolPhone'] = schoolPhone;
+    data['accountMomoPhone'] = accountMomoPhone;
     data['status'] = status;
     data['cardId'] = cardId;
     data['isCardAvailable'] = isCardAvailable;

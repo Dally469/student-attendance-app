@@ -86,6 +86,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isVerySmallScreen = screenWidth < 340;
     return Scaffold(
       backgroundColor: whiteColor,
       body: SafeArea(
@@ -121,44 +124,65 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                 ),
                 child: FadeTransition(
                   opacity: _fadeAnimation,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        child: Image.asset(
-                          'assets/images/logo_school.png',
-                          width: 80,
-                          height: 80,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          child: Image.asset(
+                            'assets/images/logo_school.png',
+                            width: 80,
+                            height: 80,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'eBridgeSchool',
-                        style: GoogleFonts.poppins(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w700,
-                          color: whiteColor,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 10,
-                              offset: const Offset(2, 2),
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 16 : 24,
+                          ),
+                          child: Text(
+                            'eBridgeSchool',
+                            style: GoogleFonts.poppins(
+                              fontSize: isSmallScreen ? 28 : 32,
+                              fontWeight: FontWeight.w700,
+                              color: whiteColor,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(2, 2),
+                                ),
+                              ],
                             ),
-                          ],
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Manage school and student information',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w400,
-                          color: whiteColor.withOpacity(0.8),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isVerySmallScreen
+                                ? 8
+                                : (isSmallScreen ? 12 : 32),
+                          ),
+                          child: Text(
+                            'Manage school and student information',
+                            style: GoogleFonts.poppins(
+                              fontSize: isVerySmallScreen
+                                  ? 10
+                                  : (isSmallScreen ? 11 : 15),
+                              fontWeight: FontWeight.w400,
+                              color: whiteColor.withOpacity(0.8),
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: true,
+                          ),
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -318,6 +342,8 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                               fontWeight: FontWeight.w400,
                               color: greyColor1,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ] else ...[
                           // School Staff login: Email and Password
@@ -450,6 +476,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     Widget? suffixIcon,
     String? Function(String?)? validator,
   }) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isVerySmallScreen = screenWidth < 340;
+
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
@@ -457,7 +486,10 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       style: GoogleFonts.poppins(fontSize: 14, color: blackColor),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.poppins(color: greyColor1),
+        labelStyle: GoogleFonts.poppins(
+          color: greyColor1,
+          fontSize: isVerySmallScreen ? 11 : 14,
+        ),
         filled: true,
         fillColor: Colors.grey[50],
         border: OutlineInputBorder(

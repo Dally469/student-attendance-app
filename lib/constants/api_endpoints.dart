@@ -38,6 +38,14 @@ class ApiEndpoints {
 
   // Payment Endpoints
   static String get payStudentFee => '$baseUrl/api/mopay/fees/pay-student';
+  static String syncFeePayment(String transactionId) =>
+      '$baseUrl/api/mopay/public/sync-fee-payment/$transactionId';
   static String checkPaymentStatus(String transactionId) =>
       '$baseUrl/api/mopay/status/$transactionId';
+  static String updateFee(String transactionId) =>
+      '$baseUrl/api/mopay/direct/update-fee/$transactionId';
+
+  // Fee Endpoints
+  static String getStudentFees(String studentId) =>
+      '$baseUrl/api/student-fees/student/$studentId';
 }

@@ -44,6 +44,9 @@ class _AttendanceConfigBottomSheetState
       widget.classroom.id ?? '',
     );
 
+    // Check if there are multiple attendances
+    // If there are multiple attendances with different modes, we'll handle it in make.attendance screen
+    // For now, just set the existing attendance
     setState(() {
       _isCheckingExisting = false;
       _hasExistingAttendance = existingAttendance != null;
@@ -58,6 +61,100 @@ class _AttendanceConfigBottomSheetState
     }
   }
 
+  void _showWarningDialog(String message) async {
+    // Get existing attendance ID if available
+    String? existingAttendanceId;
+
+    // First check if existingAttendance is already set
+    final existingAttendance = _attendanceController.existingAttendance.value;
+    if (existingAttendance?.data?.id != null) {
+      existingAttendanceId = existingAttendance!.data!.id!;
+    } else {
+      // If not available, fetch it
+      final attendance = await _attendanceController.checkTodayAttendance(
+        widget.classroom.id ?? '',
+      );
+      if (attendance?.data?.id != null) {
+        existingAttendanceId = attendance!.data!.id!;
+      }
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Warning',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.close,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog only
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pop(); // Close bottom sheet
+
+                // Navigate to scanning page if attendance ID is available
+                if (existingAttendanceId != null &&
+                    existingAttendanceId.isNotEmpty) {
+                  widget.onAttendanceReady(existingAttendanceId);
+                }
+              },
+              child: Text(
+                'Record attendance',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: primaryColor,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _createNewAttendance() async {
     await _attendanceController.createAttendance(
       widget.classroom.id ?? '',
@@ -65,11 +162,39 @@ class _AttendanceConfigBottomSheetState
       deviceType: _selectedDeviceType,
     );
 
-    if (_attendanceController.successMessage.value.isNotEmpty) {
+    // Check for errors first
+    if (_attendanceController.errorMessage.value.trim().isNotEmpty) {
+      // Show warning dialog instead of SnackBar
+      // If attendance already exists, we'll navigate to it when OK is clicked
+      if (mounted) {
+        _showWarningDialog(_attendanceController.errorMessage.value);
+      }
+      return;
+    }
+
+    // Check if attendance was actually created by checking currentAttendance directly
+    // This is more reliable than checking successMessage which might be empty
+    final currentAttendance = _attendanceController.currentAttendance.value;
+    if (currentAttendance?.data?.id != null &&
+        currentAttendance!.data!.id!.isNotEmpty) {
+      Navigator.pop(context);
+      widget.onAttendanceReady(currentAttendance.data!.id!);
+    } else {
+      // Fallback to getAttendanceId method
       final attendanceId = _attendanceController.getAttendanceId();
       if (attendanceId.isNotEmpty) {
         Navigator.pop(context);
         widget.onAttendanceReady(attendanceId);
+      } else {
+        // Show error if no attendance ID was found
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to create attendance. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -219,7 +344,7 @@ class _AttendanceConfigBottomSheetState
   Widget _buildExistingAttendanceView() {
     final attendance = _attendanceController.existingAttendance.value;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -278,7 +403,9 @@ class _AttendanceConfigBottomSheetState
                 _buildInfoRow(
                   Icons.check_circle_outline,
                   'Mode',
-                  attendance?.data?.mode == 'CHECK_IN_ONLY' ? 'Check-in Only' : 'Check-in and Check-out',
+                  attendance?.data?.mode == 'CHECK_IN_ONLY'
+                      ? 'Check-in Only'
+                      : 'Check-in and Check-out',
                 ),
                 const Divider(height: 16),
                 _buildInfoRow(
