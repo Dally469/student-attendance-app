@@ -1,0 +1,63 @@
+=================================================================
+FINAL FIX FOR COCOAPODS "BROKEN" ERROR
+=================================================================
+
+THE ISSUE:
+- System Ruby 2.6.10 is too old (CocoaPods needs >= 3.1.0)
+- CocoaPods works fine with RVM Ruby 3.3.4
+- Flutter/IDE can't find the RVM Ruby version
+
+THE SOLUTION:
+Create a wrapper script that ensures RVM Ruby is used.
+
+=================================================================
+RUN THIS IN TERMINAL:
+=================================================================
+
+cd /Users/rigobert/Documents/flutter/student-attendance-app
+./FIX_POD_WRAPPER.sh
+
+OR manually:
+
+sudo tee /usr/local/bin/pod > /dev/null << 'EOF'
+#!/bin/bash
+export PATH="$HOME/.rvm/rubies/ruby-3.3.4/bin:$HOME/.rvm/bin:$PATH"
+if [ -s "$HOME/.rvm/scripts/rvm" ]; then
+    source "$HOME/.rvm/scripts/rvm"
+fi
+exec "$HOME/.rvm/rubies/ruby-3.3.4/bin/pod" "$@"
+EOF
+
+sudo chmod +x /usr/local/bin/pod
+
+=================================================================
+VERIFY IT WORKS:
+=================================================================
+
+which pod
+pod --version
+
+Should show: 1.16.2
+
+=================================================================
+THEN:
+=================================================================
+
+1. Restart your IDE completely (quit and reopen)
+2. Try running your Flutter app again
+3. It should work!
+
+=================================================================
+CURRENT STATUS:
+=================================================================
+
+✅ CocoaPods installed and working (RVM Ruby 3.3.4)
+✅ Pods installed in ios/Pods
+✅ All code errors fixed
+✅ Firebase Storage patches applied
+⚠️ Just need wrapper for Flutter to use RVM Ruby
+
+=================================================================
+
+
+

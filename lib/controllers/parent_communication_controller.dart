@@ -6,7 +6,8 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+// Firebase removed - will use another solution later
+// import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 
 import '../models/sms.transaction.dart';
@@ -136,21 +137,25 @@ class ParentCommunicationController extends GetxController {
   }
 
   // Upload file to Firebase Storage and return the download URL
+  // Firebase removed - will use another solution later
   Future<String?> uploadFileToFirebase(File file, String fileName) async {
-    try {
-      isLoading.value = true;
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('uploads/${DateTime.now().millisecondsSinceEpoch}_$fileName');
-      final uploadTask = await storageRef.putFile(file);
-      final downloadUrl = await uploadTask.ref.getDownloadURL();
-      return downloadUrl;
-    } catch (e) {
-      errorMessage.value = 'Error uploading file to Firebase: $e';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+    // TODO: Implement alternative file upload solution
+    errorMessage.value = 'File upload not available - Firebase removed. Will implement alternative solution.';
+    return null;
+    // try {
+    //   isLoading.value = true;
+    //   final storageRef = FirebaseStorage.instance
+    //       .ref()
+    //       .child('uploads/${DateTime.now().millisecondsSinceEpoch}_$fileName');
+    //   final uploadTask = await storageRef.putFile(file);
+    //   final downloadUrl = await uploadTask.ref.getDownloadURL();
+    //   return downloadUrl;
+    // } catch (e) {
+    //   errorMessage.value = 'Error uploading file to Firebase: $e';
+    //   return null;
+    // } finally {
+    //   isLoading.value = false;
+    // }
   }
 
   // Modified SMS functionality with balance check

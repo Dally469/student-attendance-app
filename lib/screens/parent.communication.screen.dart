@@ -979,48 +979,58 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet>
                                       bool success = false;
                                       if (widget.isWhatsApp) {
                                         if (_selectedFile != null) {
-                                          String? fileUrl = await widget
-                                              .communicationController
-                                              .uploadFileToFirebase(
-                                                  _selectedFile!,
-                                                  _selectedFile!.path
-                                                      .split('/')
-                                                      .last);
-                                          if (fileUrl == null) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                  content: Text(
-                                                      'Failed to upload file')),
-                                            );
-                                            return;
-                                          }
-                                          if (_fileType == 'image') {
-                                            success = await widget
-                                                .communicationController
-                                                .sendWhatsAppImage(
-                                              classroomId: widget.classroomId,
-                                              caption: _messageController.text
-                                                  .trim(),
-                                              imageUrl: fileUrl,
-                                              students:
-                                                  widget.selectedStudentIds,
-                                            );
-                                          } else if (_fileType == 'document') {
-                                            success = await widget
-                                                .communicationController
-                                                .sendWhatsAppDocument(
-                                              classroomId: widget.classroomId,
-                                              caption: _messageController.text
-                                                  .trim(),
-                                              documentUrl: fileUrl,
-                                              documentName: _selectedFile!.path
-                                                  .split('/')
-                                                  .last,
-                                              students:
-                                                  widget.selectedStudentIds,
-                                            );
-                                          }
+                                          // Firebase removed - will use another solution later
+                                          // TODO: Implement alternative file upload solution
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                                content: Text(
+                                                    'File upload not available - Firebase removed. Will implement alternative solution.')),
+                                          );
+                                          return;
+                                          // String? fileUrl = await widget
+                                          //     .communicationController
+                                          //     .uploadFileToFirebase(
+                                          //         _selectedFile!,
+                                          //         _selectedFile!.path
+                                          //             .split('/')
+                                          //             .last);
+                                          // if (fileUrl == null) {
+                                          //   ScaffoldMessenger.of(context)
+                                          //       .showSnackBar(
+                                          //     const SnackBar(
+                                          //         content: Text(
+                                          //             'Failed to upload file')),
+                                          //   );
+                                          //   return;
+                                          // }
+                                          // Firebase removed - file upload disabled
+                                          // if (_fileType == 'image') {
+                                          //   success = await widget
+                                          //       .communicationController
+                                          //       .sendWhatsAppImage(
+                                          //     classroomId: widget.classroomId,
+                                          //     caption: _messageController.text
+                                          //         .trim(),
+                                          //     imageUrl: fileUrl,
+                                          //     students:
+                                          //         widget.selectedStudentIds,
+                                          //   );
+                                          // } else if (_fileType == 'document') {
+                                          //   success = await widget
+                                          //       .communicationController
+                                          //       .sendWhatsAppDocument(
+                                          //     classroomId: widget.classroomId,
+                                          //     caption: _messageController.text
+                                          //         .trim(),
+                                          //     documentUrl: fileUrl,
+                                          //     documentName: _selectedFile!.path
+                                          //         .split('/')
+                                          //         .last,
+                                          //     students:
+                                          //         widget.selectedStudentIds,
+                                          //   );
+                                          // }
                                         } else {
                                           success = await widget
                                               .communicationController

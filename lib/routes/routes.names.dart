@@ -24,6 +24,7 @@ String feeHistory = '/feeHistory';
 String schoolsRoute = '/schools';
 String smsHistory = '/smsHistory';
 String assignFacialData = '/assignFacialData';
+String parentStudentView = '/parent-student-view';
 
 
 

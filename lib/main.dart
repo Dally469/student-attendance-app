@@ -8,7 +8,8 @@ import 'package:attendance/controllers/school_classroom_controller.dart';
 import 'package:attendance/controllers/user_login_controller.dart';
 import 'package:attendance/screens/splash.screen.dart';
 import 'package:attendance/utils/colors.dart';
-import 'package:firebase_core/firebase_core.dart';
+// Firebase removed - will use another solution later
+// import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,8 +23,6 @@ import 'controllers/sms.controller.dart';
 import 'routes/routes.names.dart'; // Route names
 import 'routes/routes.provider.dart'; // Updated routes provider for GetX
 
-
-
 Future<void> main() async {
   // Load environment variables based on build mode
   if (kReleaseMode || kDebugMode || kProfileMode) {
@@ -31,15 +30,14 @@ Future<void> main() async {
   }
 
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp();
-   
-  } catch (e) {
-    print('Firebase initialization error: $e');
-  }
+  // Firebase removed - will use another solution later
+  // try {
+  //   await Firebase.initializeApp();
+  //
+  // } catch (e) {
+  //   print('Firebase initialization error: $e');
+  // }
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-
-  
 
   final prefs = await SharedPreferences.getInstance();
   final showHome = prefs.getBool('showHome') ?? false;
@@ -55,7 +53,6 @@ Future<void> main() async {
 
   // Initialize GetX controllers
   _initializeGetXControllers();
-
 
   runApp(MyApp(showHome: showHome));
 }
@@ -96,7 +93,7 @@ void _initializeGetXControllers() {
   Get.put(ParentCommunicationController(), permanent: true);
   Get.put(SchoolFeesController(), permanent: true);
   Get.put(SMSController(), permanent: true);
-  }
+}
 
 class MyHttpOverrides extends HttpOverrides {
   @override

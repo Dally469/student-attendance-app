@@ -1,18 +1,18 @@
+import 'package:attendance/models/parent.lookup.model.dart';
 import 'package:attendance/routes/routes.names.dart';
 import 'package:attendance/screens/add.card.dart';
 import 'package:attendance/screens/assign.card.screen.dart';
-import 'package:attendance/screens/attendance.screen.dart';
 import 'package:attendance/screens/create_attendance_screen.dart';
 import 'package:attendance/screens/home.screen.dart';
 import 'package:attendance/screens/login.dart';
 import 'package:attendance/screens/make.attendance.screen.dart';
 import 'package:attendance/screens/parent.communication.screen.dart';
+import 'package:attendance/screens/parent.student.view.dart';
 import 'package:attendance/screens/school.fees.history.screen.dart';
 import 'package:attendance/screens/splash.screen.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
- import '../screens/schools.dart';
+import '../screens/schools.dart';
 import '../screens/sms.screen.dart';
 
 class AppNavigation {
@@ -23,7 +23,6 @@ class AppNavigation {
   // Define GetX routes
   static final getPages = [
     GetPage(
-
       name: splash,
       page: () => Splash(),
     ),
@@ -65,7 +64,6 @@ class AppNavigation {
         );
       },
     ),
-   
     GetPage(
       name: makeAttendance,
       page: () {
@@ -89,7 +87,7 @@ class AppNavigation {
     GetPage(
       name: smsHistory,
       page: () {
-         return SMSTopUpScreen();
+        return SMSTopUpScreen();
       },
     ),
     GetPage(
@@ -109,6 +107,26 @@ class AppNavigation {
       name: schoolsRoute,
       page: () => SchoolManagement(),
     ),
+    GetPage(
+      name: parentStudentView,
+      page: () {
+        final args = Get.arguments as Map<String, dynamic>?;
+        if (args != null && args['studentsWithFees'] != null) {
+          final studentsList = args['studentsWithFees'] as List;
+          return ParentStudentView(
+            studentsWithFees:
+                studentsList.map((e) => e as StudentWithFees).toList(),
+            query: args['query'] as String? ?? '',
+            token: args['token'] as String?,
+            expiresIn: args['expiresIn'] as String?,
+          );
+        }
+        return const ParentStudentView(
+          studentsWithFees: [],
+          query: '',
+        );
+      },
+    ),
   ];
 
   // Navigation helper methods
@@ -117,13 +135,15 @@ class AppNavigation {
   }
 
   static void navigateToRefreshRequest() {
-    Get.toNamed(myRequests,
-        parameters: {'refresh': DateTime.now().millisecondsSinceEpoch.toString()});
+    Get.toNamed(myRequests, parameters: {
+      'refresh': DateTime.now().millisecondsSinceEpoch.toString()
+    });
   }
 
   static void navigateToRefreshHome() {
-    Get.toNamed(home,
-        parameters: {'refresh': DateTime.now().millisecondsSinceEpoch.toString()});
+    Get.toNamed(home, parameters: {
+      'refresh': DateTime.now().millisecondsSinceEpoch.toString()
+    });
   }
 
   static void navigateBack() {
