@@ -138,14 +138,17 @@ class _AssignCardPageState extends State<AssignCardPage> {
   }
 
   void _goBackToClassroom() {
-    _cardController.reset(); // Reset before navigation
-    Get.toNamed(
-      assignCard,
-      parameters: {
-        'classroom': widget.classroom.toString(),
-        'classroomId': widget.studentId.toString(),
-      },
-    );
+    // Defer reset and navigation to avoid build phase conflicts
+    Future.microtask(() {
+      _cardController.reset(); // Reset before navigation
+      Get.toNamed(
+        assignCard,
+        parameters: {
+          'classroom': widget.classroom.toString(),
+          'classroomId': widget.studentId.toString(),
+        },
+      );
+    });
   }
 
   @override
@@ -179,8 +182,11 @@ class _AssignCardPageState extends State<AssignCardPage> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () {
-              _cardController.reset();
-              Navigator.of(context).pop();
+              // Defer reset to avoid build phase conflicts
+              Future.microtask(() {
+                _cardController.reset();
+                Navigator.of(context).pop();
+              });
             },
           ),
         ),
@@ -356,8 +362,11 @@ class _AssignCardPageState extends State<AssignCardPage> {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () {
-                  _cardController.reset();
-                  isReading.value = false;
+                  // Defer reset to avoid build phase conflicts
+                  Future.microtask(() {
+                    _cardController.reset();
+                    isReading.value = false;
+                  });
                 },
                 icon: const Icon(Icons.refresh),
                 label: Text(

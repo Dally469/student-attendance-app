@@ -26,8 +26,7 @@ class _AttendanceConfigBottomSheetState
   final AttendanceController _attendanceController =
       Get.find<AttendanceController>();
 
-  String _selectedMode = 'CHECK_IN_ONLY';
-  String _selectedDeviceType = 'FACE';
+  String _selectedDeviceType = 'NFC';
   bool _isCheckingExisting = true;
   bool _hasExistingAttendance = false;
 
@@ -158,7 +157,7 @@ class _AttendanceConfigBottomSheetState
   Future<void> _createNewAttendance() async {
     await _attendanceController.createAttendance(
       widget.classroom.id ?? '',
-      mode: _selectedMode,
+      mode: 'CHECK_IN_OUT', // Default mode, no longer user-selectable
       deviceType: _selectedDeviceType,
     );
 
@@ -401,14 +400,6 @@ class _AttendanceConfigBottomSheetState
                 ),
                 const Divider(height: 16),
                 _buildInfoRow(
-                  Icons.check_circle_outline,
-                  'Mode',
-                  attendance?.data?.mode == 'CHECK_IN_ONLY'
-                      ? 'Check-in Only'
-                      : 'Check-in and Check-out',
-                ),
-                const Divider(height: 16),
-                _buildInfoRow(
                   Icons.devices,
                   'Device Type',
                   attendance?.data?.deviceType ?? 'FACE',
@@ -491,12 +482,6 @@ class _AttendanceConfigBottomSheetState
             _buildSectionTitle('Device Type'),
             const SizedBox(height: 12),
             _buildDeviceTypeSelector(),
-            const SizedBox(height: 24),
-
-            // Mode Selection
-            _buildSectionTitle('Attendance Mode'),
-            const SizedBox(height: 12),
-            _buildModeSelector(),
             const SizedBox(height: 32),
 
             // Create button
@@ -565,6 +550,7 @@ class _AttendanceConfigBottomSheetState
             Icons.face,
             primaryColor,
             'Use facial recognition for attendance',
+            enabled: false, // Disable Face Recognition
           ),
           Divider(
             height: 1,
@@ -587,152 +573,62 @@ class _AttendanceConfigBottomSheetState
     String title,
     IconData icon,
     Color color,
-    String description,
-  ) {
-    final isSelected = _selectedDeviceType == value;
-
+    String description, {
+    bool enabled = true,
+  }) {
+    final isDisabled = !enabled;
+    
     return InkWell(
-      onTap: () => setState(() => _selectedDeviceType = value),
+      onTap: isDisabled ? null : () => setState(() => _selectedDeviceType = value),
       borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
+      child: Opacity(
+        opacity: isDisabled ? 0.5 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 24),
               ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: isDisabled
+                            ? Colors.grey.shade400
+                            : Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    description,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
+                    const SizedBox(height: 2),
+                    Text(
+                      isDisabled ? 'Currently disabled' : description,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: isDisabled ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Radio<String>(
-              value: value,
-              groupValue: _selectedDeviceType,
-              activeColor: primaryColor,
-              onChanged: (val) => setState(() => _selectedDeviceType = val!),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModeSelector() {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          _buildModeOption(
-            'CHECK_IN_ONLY',
-            'Check In Only',
-            'Students can only check in',
-            Icons.login,
+              Radio<String>(
+                value: value,
+                groupValue: _selectedDeviceType,
+                activeColor: primaryColor,
+                onChanged: isDisabled ? null : (val) => setState(() => _selectedDeviceType = val!),
+              ),
+            ],
           ),
-          Divider(
-            height: 1,
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-          ),
-          _buildModeOption(
-            'CHECK_IN_OUT',
-            'Check In / Check Out',
-            'Students can check in and check out',
-            Icons.logout,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModeOption(
-    String value,
-    String title,
-    String description,
-    IconData icon,
-  ) {
-    final isSelected = _selectedMode == value;
-
-    return InkWell(
-      onTap: () => setState(() => _selectedMode = value),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? primaryColor.withOpacity(0.1)
-                    : Colors.grey.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                color: isSelected ? primaryColor : Colors.grey,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    description,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Radio<String>(
-              value: value,
-              groupValue: _selectedMode,
-              activeColor: primaryColor,
-              onChanged: (val) => setState(() => _selectedMode = val!),
-            ),
-          ],
         ),
       ),
     );

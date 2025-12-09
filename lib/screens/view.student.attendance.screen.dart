@@ -323,38 +323,6 @@ class _ViewStudentAttendanceScreenState
                                         ],
                                       ),
                                       const SizedBox(height: 12),
-                                      // Check Type
-                                      if (record.checkType != null)
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              record.checkType == 'CHECK_IN'
-                                                  ? Icons.login
-                                                  : record.checkType ==
-                                                          'CHECK_OUT'
-                                                      ? Icons.logout
-                                                      : Icons.swap_horiz,
-                                              size: 16,
-                                              color: primaryColor,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              record.checkType == 'CHECK_IN'
-                                                  ? 'Check In'
-                                                  : record.checkType ==
-                                                          'CHECK_OUT'
-                                                      ? 'Check Out'
-                                                      : record.checkType ??
-                                                          'N/A',
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500,
-                                                color: blackColor,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      const SizedBox(height: 8),
                                       // Check In Time
                                       if (record.checkInTime != null)
                                         _buildDetailRow(

@@ -15,6 +15,11 @@ class ClassroomStudentController extends GetxController {
   final RxString searchQuery = ''.obs;
   final RxString currentFilter = 'all'.obs; // Track current filter
 
+  // Workers for reactive updates
+  Worker? _filterWorker;
+  Worker? _searchWorker;
+  Worker? _studentsWorker;
+
   // Helper method to check if student has card
   bool hasCard(StudentData student) {
     return student.cardId != null &&
@@ -31,10 +36,33 @@ class ClassroomStudentController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Listen to filter and search changes to update filtered list
-    ever(currentFilter, (_) => _updateFilteredList());
-    ever(searchQuery, (_) => _updateFilteredList());
-    ever(students, (_) => _updateFilteredList());
+    // Use debounce to delay updates and avoid build phase conflicts
+    // Debounce search and filter changes to prevent rapid updates during build
+    _filterWorker = debounce(
+      currentFilter,
+      (_) => _updateFilteredList(),
+      time: const Duration(milliseconds: 100),
+    );
+    _searchWorker = debounce(
+      searchQuery,
+      (_) => _updateFilteredList(),
+      time: const Duration(milliseconds: 100),
+    );
+    // For students list, use debounce with shorter delay since it's less frequent
+    _studentsWorker = debounce(
+      students,
+      (_) => _updateFilteredList(),
+      time: const Duration(milliseconds: 50),
+    );
+  }
+
+  @override
+  void onClose() {
+    // Dispose workers to prevent memory leaks
+    _filterWorker?.dispose();
+    _searchWorker?.dispose();
+    _studentsWorker?.dispose();
+    super.onClose();
   }
 
   // Function to fetch students by classroom ID
@@ -51,6 +79,9 @@ class ClassroomStudentController extends GetxController {
         students.sort((a, b) => (a.name ?? '')
             .toLowerCase()
             .compareTo((b.name ?? '').toLowerCase()));
+        // Explicitly update filtered list after students are loaded
+        // This ensures the update happens after the async operation completes
+        Future.microtask(() => _updateFilteredList());
       } else {
         errorMessage.value = result.message ?? 'Failed to fetch students';
       }
@@ -110,7 +141,8 @@ class ClassroomStudentController extends GetxController {
 
   // Update filtered list based on search and filter
   void _updateFilteredList() {
-    // Defer the update to avoid calling setState during build
+    // Debounce already handles timing, but use microtask as extra safety
+    // to ensure this runs after the current synchronous execution
     Future.microtask(() {
       List<StudentData> tempList = [];
 

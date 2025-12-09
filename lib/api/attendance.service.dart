@@ -136,12 +136,12 @@ class AttendanceService {
           '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
       body['checkInTime'] = checkInTimeStr;
 
-      // Use the same endpoint for both check-in and check-out
-      // Format: /api/attendance/check-in/{attendanceId}/student/{studentId}
+      // Use the scan endpoint for attendance
+      // Format: /api/attendance/scan/{attendanceId}/student/{studentId}
       final uri = Uri.parse(
-          '${dotenv.get('mainUrl')}/api/attendance/check-in/$attendanceId/student/$studentId');
+          '${dotenv.get('mainUrl')}/api/attendance/scan/$attendanceId/student/$studentId');
 
-      print('=== POST Check-In Request ===');
+      print('=== POST Scan Attendance Request ===');
       print('URL: $uri');
       print('Headers: $headers');
       print('Body: ${jsonEncode(body)}');
