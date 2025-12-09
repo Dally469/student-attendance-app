@@ -7,11 +7,13 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/check.in.model.dart' as legacy;
 import '../models/check_in.dart';
 import '../models/offline_check_in.dart';
 import '../models/attendance_sync_request.dart';
+import '../models/student.attendance.record.dart';
 
 class AttendanceService {
   // Helper method to clean token (remove JSON encoding quotes)
@@ -571,7 +573,7 @@ class AttendanceService {
     try {
       if (Platform.isAndroid) {
         final androidInfo = await deviceInfo.androidInfo;
-        deviceId = androidInfo.device!;
+        deviceId = androidInfo.device;
       } else if (Platform.isIOS) {
         final iosInfo = await deviceInfo.iosInfo;
         deviceId = iosInfo.identifierForVendor ?? 'ios-device';
@@ -660,6 +662,73 @@ class AttendanceService {
       print(
           'Error syncing attendance records for classroom $classroomId on $attendanceDate: $e');
       return false;
+    }
+  }
+
+  /// Get attendance records by student code
+  /// Returns a list of attendance records for a student within a date range
+  Future<StudentAttendanceResponse> getAttendanceByStudentCode(
+    String studentCode,
+    String startDate,
+    String endDate,
+  ) async {
+    try {
+      SharedPreferences sharedPreferences =
+          await SharedPreferences.getInstance();
+      String? parentToken = sharedPreferences.getString('parentToken');
+
+      if (parentToken == null || parentToken.isEmpty) {
+        return StudentAttendanceResponse(
+          status: 401,
+          success: false,
+          message: 'Authentication token not found',
+          data: [],
+        );
+      }
+
+      Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': parentToken.replaceAll('"', ''),
+      };
+
+      final uri = Uri.parse(
+        '${dotenv.get('mainUrl')}/api/attendance/student/by-code?code=$studentCode&startDate=$startDate&endDate=$endDate',
+      );
+
+      debugPrint('=== GET Attendance by Student Code Request ===');
+      debugPrint('URL: $uri');
+      debugPrint('Headers: $headers');
+      debugPrint('Student Code: $studentCode');
+      debugPrint('Start Date: $startDate');
+      debugPrint('End Date: $endDate');
+
+      var response = await http.get(uri, headers: headers);
+
+      debugPrint('Response Status: ${response.statusCode}');
+      debugPrint('Response Body: ${response.body}');
+      debugPrint('==============================================');
+
+      if (response.statusCode == 200) {
+        Map<String, dynamic> results = jsonDecode(response.body);
+        return StudentAttendanceResponse.fromJson(results);
+      } else {
+        Map<String, dynamic> errorResults = jsonDecode(response.body);
+        return StudentAttendanceResponse(
+          status: response.statusCode,
+          success: false,
+          message:
+              errorResults['message'] ?? 'Failed to fetch attendance records',
+          data: [],
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching attendance by student code: $e');
+      return StudentAttendanceResponse(
+        status: 500,
+        success: false,
+        message: 'An error occurred: $e',
+        data: [],
+      );
     }
   }
 }

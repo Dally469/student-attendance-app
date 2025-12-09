@@ -5,6 +5,7 @@ import 'package:attendance/models/student.model.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:attendance/utils/notifiers.dart';
 import 'package:attendance/api/auth.service.dart';
+import 'package:attendance/screens/view.student.attendance.screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -706,6 +707,35 @@ class _ParentFeeDetailsScreenState extends State<ParentFeeDetailsScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.event_note, color: whiteColor),
+            onPressed: () {
+              final studentCode = student?.code;
+              final studentName = student?.name ?? 'Student';
+              if (studentCode != null && studentCode.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ViewStudentAttendanceScreen(
+                      studentCode: studentCode,
+                      studentName: studentName,
+                    ),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Student code not available',
+                      style: GoogleFonts.poppins(),
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            tooltip: 'View Attendance',
+          ),
           TextButton.icon(
             onPressed: _isRefreshing ? null : _refreshFees,
             icon: _isRefreshing
@@ -815,6 +845,87 @@ class _ParentFeeDetailsScreenState extends State<ParentFeeDetailsScreen> {
                                     ),
                                 ],
                               ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          // View Attendance Button
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.blue,
+                                  Colors.blue.withOpacity(0.8),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.blue.withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  final studentCode = student?.code;
+                                  final studentName = student?.name ?? 'Student';
+                                  if (studentCode != null && studentCode.isNotEmpty) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ViewStudentAttendanceScreen(
+                                          studentCode: studentCode,
+                                          studentName: studentName,
+                                        ),
+                                      ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Student code not available',
+                                          style: GoogleFonts.poppins(),
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 14, horizontal: 16),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.event_note,
+                                        color: whiteColor,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'View Attendance',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                          color: whiteColor,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(
+                                        Icons.arrow_forward_ios,
+                                        color: whiteColor,
+                                        size: 14,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 24),
