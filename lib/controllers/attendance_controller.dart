@@ -176,10 +176,11 @@ class AttendanceController extends GetxController {
     return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
   }
 
-  // Function to create attendance
+  // Function to create attendance.
+  // Use mode CHECK_IN_OUT so users can clock in and clock out (scan: first=in, second=out; explicit: check-in then check-out).
   Future<void> createAttendance(
     String classroomId, {
-    String mode = 'CHECK_IN_ONLY',
+    String mode = 'CHECK_IN_OUT',
     String deviceType = 'FACE',
     String? schoolId,
   }) async {
