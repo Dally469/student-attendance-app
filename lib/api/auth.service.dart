@@ -79,22 +79,19 @@ class AuthService {
     Map<String, String> headers = {'Content-Type': 'application/json'};
 
     final url = ApiEndpoints.login;
-    final requestBody = {
-      'username': username,
-      'password': '***'
-    }; // Hide password in logs
+    final bodySent = {
+      'username': username.toString(),
+      'password': password.toString(),
+    };
 
     debugPrint('=== POST Login Request ===');
     debugPrint('URL: $url');
     debugPrint('Headers: $headers');
-    debugPrint('Body: ${json.encode(requestBody)}');
+    debugPrint('Body: ${json.encode(bodySent)}');
 
     var response = await http.post(Uri.parse(url),
         headers: headers,
-        body: json.encode({
-          'username': username.toString(),
-          'password': password.toString()
-        }));
+        body: json.encode(bodySent));
 
     debugPrint('Response Status: ${response.statusCode}');
     debugPrint('Response Body: ${response.body}');

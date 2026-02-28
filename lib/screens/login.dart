@@ -1,6 +1,7 @@
 import 'package:attendance/controllers/user_login_controller.dart';
 import 'package:attendance/utils/colors.dart';
 import 'package:attendance/utils/notifiers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -433,14 +434,23 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                   ),
                                   onPressed: () {
                                     if (_formKey.currentState!.validate()) {
+                                      final username =
+                                          _emailController.text.trim();
+                                      final password = _passwordController.text;
+
+                                      // Log credentials (password only in debug)
                                       if (_userType == UserType.parent) {
+                                        debugPrint(
+                                            '[Login] userType=parent, identifier=$username');
                                         _loginController.fetchStudentsByParent(
-                                          _emailController.text.trim(),
+                                          username,
                                         );
                                       } else {
+                                        debugPrint(
+                                            '[Login] userType=schoolStaff, username=$username, password=${kDebugMode ? password : "***"}');
                                         _loginController.login(
-                                          _emailController.text.trim(),
-                                          _passwordController.text,
+                                          username,
+                                          password,
                                         );
                                       }
                                     }
