@@ -23,16 +23,31 @@ class AttendanceSettingsResponse {
 }
 
 class AttendanceSettingsData {
-  AttendanceSetting? settings;
+  List<AttendanceSetting>? settings;
   List<AttendanceEvent>? events;
 
   AttendanceSettingsData({this.settings, this.events});
 
   AttendanceSettingsData.fromJson(Map<String, dynamic> json) {
-    settings = json['settings'] != null
-        ? AttendanceSetting.fromJson(
-            json['settings'] as Map<String, dynamic>)
-        : null;
+    if (json['settings'] != null) {
+      if (json['settings'] is List) {
+        final list = <AttendanceSetting>[];
+        for (final e in json['settings'] as List) {
+          if (e is Map<String, dynamic>) {
+            try {
+              list.add(AttendanceSetting.fromJson(e));
+            } catch (_) {}
+          }
+        }
+        settings = list.isEmpty ? null : list;
+      } else if (json['settings'] is Map<String, dynamic>) {
+        settings = [AttendanceSetting.fromJson(json['settings'] as Map<String, dynamic>)];
+      } else {
+        settings = null;
+      }
+    } else {
+      settings = null;
+    }
     events = json['events'] != null
         ? (json['events'] as List)
             .map((e) => AttendanceEvent.fromJson(e as Map<String, dynamic>))
@@ -50,6 +65,7 @@ class AttendanceSetting {
   String? attendanceStartTime;
   String? attendanceEndTime;
   int? minClockInOutIntervalMinutes;
+  String? timezone;
   String? deviceType;
 
   AttendanceSetting({
@@ -61,6 +77,7 @@ class AttendanceSetting {
     this.attendanceStartTime,
     this.attendanceEndTime,
     this.minClockInOutIntervalMinutes,
+    this.timezone,
     this.deviceType,
   });
 
@@ -73,6 +90,7 @@ class AttendanceSetting {
     attendanceStartTime = json['attendanceStartTime'];
     attendanceEndTime = json['attendanceEndTime'];
     minClockInOutIntervalMinutes = json['minClockInOutIntervalMinutes'];
+    timezone = json['timezone'];
     deviceType = json['deviceType'];
   }
 }

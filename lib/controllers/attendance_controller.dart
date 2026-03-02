@@ -28,15 +28,20 @@ class AttendanceController extends GetxController {
   final Rx<AttendanceSettingsResponse?> attendanceSettings =
       Rx<AttendanceSettingsResponse?>(null);
   final RxBool isLoadingSettings = false.obs;
+
   /// Selected event id for attendance; null = use default school settings.
   final Rx<String?> selectedAttendanceEventId = Rx<String?>(null);
 
   // Record Attendance bottom sheet: choose Event or Student Attendance
   /// Record Attendance flow: 'none' (choose type), 'event', or 'student'.
   final RxString recordAttendanceMode = 'none'.obs;
+
   /// Events from GET api/attendance/events (for event attendance).
   final RxList<AttendanceEvent> attendanceEventsList = <AttendanceEvent>[].obs;
   final RxBool isLoadingEvents = false.obs;
+
+  /// Selected settings id for Student Attendance (when data.settings is a list).
+  final Rx<String?> selectedSettingsId = Rx<String?>(null);
 
   // Helper method to safely get attendance ID
   String getAttendanceId() {
@@ -98,7 +103,27 @@ class AttendanceController extends GetxController {
   void resetRecordAttendanceMode() {
     recordAttendanceMode.value = 'none';
     selectedAttendanceEventId.value = null;
+    selectedSettingsId.value = null;
     attendanceEventsList.clear();
+  }
+
+  /// First setting from data.settings list, or null.
+  AttendanceSetting? get firstSetting {
+    final list = attendanceSettings.value?.data?.settings;
+    return (list != null && list.isNotEmpty) ? list.first : null;
+  }
+
+  /// Currently selected setting for Student Attendance (selected id or first).
+  AttendanceSetting? get selectedOrFirstSetting {
+    final list = attendanceSettings.value?.data?.settings;
+    if (list == null || list.isEmpty) return null;
+    final id = selectedSettingsId.value;
+    if (id != null && id.isNotEmpty) {
+      try {
+        return list.firstWhere((s) => s.id == id);
+      } catch (_) {}
+    }
+    return list.first;
   }
 
   /// Fetch events from GET api/attendance/events for event attendance.
@@ -134,7 +159,9 @@ class AttendanceController extends GetxController {
         date: date,
       );
 
-      if (result.success == true && result.data != null && result.data!.id != null) {
+      if (result.success == true &&
+          result.data != null &&
+          result.data!.id != null) {
         currentAttendance.value = result;
         attendanceId.value = result.data!.id!;
         successMessage.value = result.message ?? 'Event sheet created';
@@ -230,7 +257,8 @@ class AttendanceController extends GetxController {
     } catch (e) {
       // Connection errors or other failures - treat as "no attendance found"
       // This allows creation to proceed
-      print('Error checking today\'s attendance (will proceed with creation): $e');
+      print(
+          'Error checking today\'s attendance (will proceed with creation): $e');
       existingAttendance.value = null;
       return null; // Return null to allow creation to proceed
     } finally {
@@ -321,7 +349,8 @@ class AttendanceController extends GetxController {
       if (existingToday != null && existingToday.data != null) {
         // Found existing attendance - set it as current and return
         currentAttendance.value = existingToday;
-        if (existingToday.data?.id != null && existingToday.data!.id!.isNotEmpty) {
+        if (existingToday.data?.id != null &&
+            existingToday.data!.id!.isNotEmpty) {
           attendanceId.value = existingToday.data!.id!;
           print('Using existing attendance with ID: ${attendanceId.value}');
         }
@@ -329,7 +358,7 @@ class AttendanceController extends GetxController {
         await Future.delayed(const Duration(milliseconds: 500));
         return;
       }
-      
+
       // No attendance found or check failed - proceed with creation
       print('No existing attendance found, proceeding with creation...');
 
@@ -387,29 +416,30 @@ class AttendanceController extends GetxController {
       } else {
         // Check if the error indicates attendance already exists
         final errorMsg = (result.message ?? '').toLowerCase();
-        if (result.status == 400 && 
-            (errorMsg.contains('already exists') || 
-             errorMsg.contains('already exist'))) {
+        if (result.status == 400 &&
+            (errorMsg.contains('already exists') ||
+                errorMsg.contains('already exist'))) {
           print('Attendance already exists, attempting to fetch it...');
-          
+
           // Try to fetch the existing attendance
           try {
             final today = DateTime.now();
             final dateStr = _formatDate(today);
-            
+
             // Get all attendances for today
-            final allAttendances = await _attendanceService.getAllAttendancesByClassroomDate(
+            final allAttendances =
+                await _attendanceService.getAllAttendancesByClassroomDate(
               classroomId,
               dateStr,
             );
-            
+
             // Find the attendance matching deviceType and mode
             Data? matchingAttendance;
             try {
               matchingAttendance = allAttendances.firstWhere(
-                (att) => 
-                  att.deviceType?.toUpperCase() == deviceType.toUpperCase() &&
-                  att.mode?.toUpperCase() == mode.toUpperCase(),
+                (att) =>
+                    att.deviceType?.toUpperCase() == deviceType.toUpperCase() &&
+                    att.mode?.toUpperCase() == mode.toUpperCase(),
               );
             } catch (e) {
               // No exact match found, try to get the first one if available
@@ -417,7 +447,7 @@ class AttendanceController extends GetxController {
                 matchingAttendance = allAttendances.first;
               }
             }
-            
+
             if (matchingAttendance != null) {
               // Create AttendanceModel from the found attendance
               currentAttendance.value = AttendanceModel(
@@ -434,12 +464,14 @@ class AttendanceController extends GetxController {
                   schoolId: matchingAttendance.schoolId ?? finalSchoolId,
                 ),
               );
-              
-              if (matchingAttendance.id != null && matchingAttendance.id!.isNotEmpty) {
+
+              if (matchingAttendance.id != null &&
+                  matchingAttendance.id!.isNotEmpty) {
                 attendanceId.value = matchingAttendance.id!;
-                print('Found existing attendance with ID: ${attendanceId.value}');
+                print(
+                    'Found existing attendance with ID: ${attendanceId.value}');
               }
-              
+
               successMessage.value = 'Using existing attendance session';
               await Future.delayed(const Duration(milliseconds: 500));
               return; // Successfully found and set existing attendance
@@ -449,25 +481,27 @@ class AttendanceController extends GetxController {
             // Fall through to show error message
           }
         }
-        
+
         errorMessage.value = result.message ?? 'Failed to create attendance';
         await Future.delayed(const Duration(milliseconds: 500));
         print('Error creating attendance: ${errorMessage.value}');
       }
     } catch (e) {
       print('Exception in createAttendance: $e');
-      
+
       // Check if it's a connection error
       final errorString = e.toString().toLowerCase();
-      if (errorString.contains('connection refused') || 
+      if (errorString.contains('connection refused') ||
           errorString.contains('socketexception') ||
           errorString.contains('failed host lookup') ||
           errorString.contains('network is unreachable')) {
-        errorMessage.value = 'Cannot connect to server. Please check your internet connection and try again.';
+        errorMessage.value =
+            'Cannot connect to server. Please check your internet connection and try again.';
       } else {
-        errorMessage.value = 'An error occurred while creating attendance: ${e.toString()}';
+        errorMessage.value =
+            'An error occurred while creating attendance: ${e.toString()}';
       }
-      
+
       await Future.delayed(const Duration(milliseconds: 500));
       print('Error creating attendance: ${errorMessage.value}');
     } finally {

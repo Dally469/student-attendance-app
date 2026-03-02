@@ -19,6 +19,17 @@ import '../models/student.model.dart';
 import '../constants/api_endpoints.dart';
 
 class AttendanceService {
+  // Kigali timezone: Africa/Kigali = UTC+2 (no DST)
+  static const int _kigaliUtcOffsetHours = 2;
+
+  /// Current date and time in Kigali timezone, formatted as yyyy-MM-dd HH:mm:ss
+  static String nowInKigaliFormatted() {
+    final utc = DateTime.now().toUtc();
+    final kigali = utc.add(const Duration(hours: _kigaliUtcOffsetHours));
+    return '${kigali.year}-${kigali.month.toString().padLeft(2, '0')}-${kigali.day.toString().padLeft(2, '0')} '
+        '${kigali.hour.toString().padLeft(2, '0')}:${kigali.minute.toString().padLeft(2, '0')}:${kigali.second.toString().padLeft(2, '0')}';
+  }
+
   // Helper method to clean token (remove JSON encoding quotes)
   String _cleanToken(String? token) {
     if (token == null || token.isEmpty) return '';
@@ -132,22 +143,20 @@ class AttendanceService {
       if (mode != null && mode.isNotEmpty) {
         body['mode'] = mode;
       }
-      // Format time as full datetime with HH:MM:SS time portion
-      // Create datetime string with today's date and current time
-      final now = DateTime.now();
-      String checkInTimeStr = checkTime ??
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+      // Real date and time in Kigali timezone (Africa/Kigali = UTC+2)
+      String checkInTimeStr = checkTime ?? nowInKigaliFormatted();
       body['checkInTime'] = checkInTimeStr;
 
-      // Use the scan endpoint for attendance
-      // Format: /api/attendance/scan/{attendanceId}/student/{studentId}
-      final uri = Uri.parse(
-          '${dotenv.get('mainUrl')}/api/attendance/scan/$attendanceId/student/$studentId');
+      // Non-event attendance: POST /api/attendance/check-in/{attendanceId}/student/{studentId}
+      // For CHECK_IN_OUT, if student already has check-in, backend can record check-out
+      final uri =
+          Uri.parse(ApiEndpoints.attendanceCheckIn(attendanceId, studentId));
 
-      print('=== POST Scan Attendance Request ===');
-      print('URL: $uri');
-      print('Headers: $headers');
-      print('Body: ${jsonEncode(body)}');
+      if (kDebugMode) {
+        print('=== POST Check-in (non-event) Request ===');
+        print('URL: $uri');
+        print('Body: ${jsonEncode(body)}');
+      }
 
       var response = await http.post(
         uri,
@@ -155,9 +164,11 @@ class AttendanceService {
         body: jsonEncode(body),
       );
 
-      print('Response Status: ${response.statusCode}');
-      print('Response Body: ${response.body}');
-      print('=============================');
+      if (kDebugMode) {
+        print('Response Status: ${response.statusCode}');
+        print('Response Body: ${response.body}');
+        print('==========================================');
+      }
 
       Map<String, dynamic> results = jsonDecode(response.body);
 
@@ -212,8 +223,8 @@ class AttendanceService {
     }
   }
 
-  // Check-out a student (uses the same endpoint as check-in)
-  // The endpoint automatically detects if student already checked in and performs check-out
+  /// Non-event check-out: use same endpoint as check-in.
+  /// POST /api/attendance/check-in/{attendanceId}/student/{studentId} — when student already has check-in, backend records check-out.
   Future<legacy.CheckInModel> checkOutStudent({
     required String studentId,
     required String classroomId,
@@ -224,8 +235,6 @@ class AttendanceService {
     String? checkTime,
     String? mode,
   }) async {
-    // Use the same check-in endpoint - it will automatically handle check-out
-    // if the student already has a check-in record
     return await markAttendance(
       studentId: studentId,
       classroomId: classroomId,
@@ -285,9 +294,9 @@ class AttendanceService {
     } catch (e) {
       print('Error in getAttendanceById: $e');
       return AttendanceModel(
-          success: false,
-          status: 500,
-          message: 'Error: ${e.toString()}',
+        success: false,
+        status: 500,
+        message: 'Error: ${e.toString()}',
       );
     }
   }
@@ -299,7 +308,8 @@ class AttendanceService {
       String? token = prefs.getString('token');
 
       if (token == null) {
-        return StudentModel(success: false, message: 'Authentication token not found');
+        return StudentModel(
+            success: false, message: 'Authentication token not found');
       }
 
       Map<String, String> headers = {
@@ -518,12 +528,18 @@ class AttendanceService {
         return AttendanceSettingsResponse(
           status: response.statusCode,
           success: false,
-          message: errorResults?['message'] ?? 'Failed to fetch attendance settings',
+          message:
+              errorResults?['message'] ?? 'Failed to fetch attendance settings',
         );
       }
 
       Map<String, dynamic> results = jsonDecode(response.body);
-      return AttendanceSettingsResponse.fromJson(results);
+      final parsed = AttendanceSettingsResponse.fromJson(results);
+      if (kDebugMode) {
+        final count = parsed.data?.settings?.length ?? 0;
+        print('=== Attendance settings loaded: $count setting(s) ===');
+      }
+      return parsed;
     } catch (e) {
       if (kDebugMode) print('Error getAttendanceSettings: $e');
       return AttendanceSettingsResponse(
@@ -697,7 +713,8 @@ class AttendanceService {
       final authToken = _cleanToken(token);
       Map<String, String> headers = {
         'Content-Type': 'application/json',
-        'Authorization': authToken.startsWith('Bearer ') ? authToken : 'Bearer $authToken',
+        'Authorization':
+            authToken.startsWith('Bearer ') ? authToken : 'Bearer $authToken',
       };
 
       final uri = Uri.parse(ApiEndpoints.attendanceScanCard);
@@ -709,11 +726,16 @@ class AttendanceService {
         body['eventId'] = eventId;
       }
       // Student identifier: send whichever we have (API accepts studentCode, code, regNumber, cardId, cardNumber)
-      if (studentCode != null && studentCode.isNotEmpty) body['studentCode'] = studentCode;
+      if (studentCode != null && studentCode.isNotEmpty)
+        body['studentCode'] = studentCode;
       if (code != null && code.isNotEmpty) body['code'] = code;
-      if (regNumber != null && regNumber.isNotEmpty) body['regNumber'] = regNumber;
+      if (regNumber != null && regNumber.isNotEmpty)
+        body['regNumber'] = regNumber;
       if (cardId != null && cardId.isNotEmpty) body['cardId'] = cardId;
-      if (cardNumber != null && cardNumber.isNotEmpty) body['cardNumber'] = cardNumber;
+      if (cardNumber != null && cardNumber.isNotEmpty)
+        body['cardNumber'] = cardNumber;
+      // Real date and time in Kigali timezone for event scan
+      body['checkInTime'] = nowInKigaliFormatted();
       final bodyJson = jsonEncode(body);
       if (kDebugMode) {
         print('=== [Event attendance] POST /api/attendance/scan/card ===');
@@ -795,7 +817,8 @@ class AttendanceService {
       }
 
       final uri = Uri.parse(ApiEndpoints.attendanceCreate);
-      var response = await http.post(uri, headers: headers, body: jsonEncode(body));
+      var response =
+          await http.post(uri, headers: headers, body: jsonEncode(body));
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         Map<String, dynamic>? err;

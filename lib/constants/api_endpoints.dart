@@ -33,6 +33,9 @@ class ApiEndpoints {
       '$baseUrl/api/attendance/$attendanceId/students';
   static String get studentAttendanceCheckIn =>
       '$baseUrl/api/student-attendance/check-in';
+  /// Non-event: POST check-in. For CHECK_IN_OUT, if already checked in, can record check-out.
+  static String attendanceCheckIn(String attendanceId, String studentId) =>
+      '$baseUrl/api/attendance/check-in/$attendanceId/student/$studentId';
   static String get attendanceCheckOut => '$baseUrl/api/attendance/check-out';
   static String attendanceByClassroomAndDate(String classroomId, String date) =>
       '$baseUrl/api/attendance/classroom/$classroomId/date?date=$date';

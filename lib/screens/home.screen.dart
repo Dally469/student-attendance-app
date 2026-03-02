@@ -1509,7 +1509,7 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
     return Obx(() {
       final mode = ctrl.recordAttendanceMode.value;
 
-      // Step 1: Choose Event vs Student Attendance
+      // Step 1: Choose Attendance Mode (Event vs Student Attendance)
       if (mode == 'none') {
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -1518,7 +1518,7 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'How do you want to record attendance?',
+                'Choose Attendance Mode',
                 style: GoogleFonts.poppins(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -1564,7 +1564,10 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
               Row(
                 children: [
                   TextButton.icon(
-                    onPressed: () => ctrl.resetRecordAttendanceMode(),
+                    onPressed: () {
+                      ctrl.resetRecordAttendanceMode();
+                      setState(() => _showClassListForCreateSheet = false);
+                    },
                     icon: const Icon(Icons.arrow_back, size: 18),
                     label: const Text('Change'),
                     style: TextButton.styleFrom(
@@ -1671,9 +1674,9 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
             ),
           );
         }
-        final settings =
+        final settingsList =
             ctrl.attendanceSettings.value?.data?.settings;
-        if (settings == null) {
+        if (settingsList == null || settingsList.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Text(
@@ -1685,6 +1688,7 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
             ),
           );
         }
+        final selectedId = ctrl.selectedSettingsId.value;
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Column(
@@ -1694,7 +1698,10 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
               Row(
                 children: [
                   TextButton.icon(
-                    onPressed: () => ctrl.resetRecordAttendanceMode(),
+                    onPressed: () {
+                      ctrl.resetRecordAttendanceMode();
+                      setState(() => _showClassListForCreateSheet = false);
+                    },
                     icon: const Icon(Icons.arrow_back, size: 18),
                     label: const Text('Change'),
                     style: TextButton.styleFrom(
@@ -1712,16 +1719,27 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                 ),
               ),
               const SizedBox(height: 10),
-              _buildSettingsCard(
-                attendanceController: ctrl,
-                isSelected: true,
-                title: 'Default school settings',
-                subtitle: _defaultSettingsSubtitle(settings),
-                icon: Icons.settings_outlined,
-                onTap: () {},
-              ),
-              const SizedBox(height: 16),
-              _buildCreateSheetButton(isEvent: false),
+              ...settingsList.map((setting) {
+                final isSelected = selectedId == null ||
+                    selectedId.isEmpty ||
+                    selectedId == setting.id;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10.0),
+                  child: _buildSettingsCard(
+                    attendanceController: ctrl,
+                    isSelected: isSelected,
+                    title: setting.attendanceMode ?? 'Attendance',
+                    subtitle: _defaultSettingsSubtitle(setting),
+                    icon: Icons.settings_outlined,
+                    onTap: () => ctrl.selectedSettingsId.value = setting.id,
+                  ),
+                );
+              }),
+              // Hide "Record attendance" button when class list is showing; show again when user goes back
+              if (!_showClassListForCreateSheet) ...[
+                const SizedBox(height: 16),
+                _buildCreateSheetButton(isEvent: false),
+              ],
             ],
           ),
         );
@@ -1793,7 +1811,9 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                 )
               : const Icon(Icons.add_chart, size: 20),
           label: Text(
-            isCreating ? 'Recording...' : 'Record attendance',
+            isCreating
+                ? (isEvent ? 'Proceeding...' : 'Recording...')
+                : (isEvent ? 'Proceed with attendance' : 'Record attendance'),
             style: GoogleFonts.poppins(
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -2071,10 +2091,7 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
               return const SizedBox.shrink();
             }
             final mode = Get.find<AttendanceController>()
-                .attendanceSettings
-                .value
-                ?.data
-                ?.settings
+                .selectedOrFirstSetting
                 ?.attendanceMode;
             if (mode != 'CHECK_IN_OUT') return const SizedBox.shrink();
 
@@ -2257,8 +2274,7 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
   /// Create with settingsId only (CHECK_IN_OUT → all classrooms). No classroomId.
   Future<void> _createAttendanceForAllClassroomsAndNavigate() async {
     final attendanceController = Get.find<AttendanceController>();
-    final settings = attendanceController.attendanceSettings.value?.data?.settings;
-    final settingsId = settings?.id;
+    final settingsId = attendanceController.selectedOrFirstSetting?.id;
     if (settingsId == null || settingsId.isEmpty) {
       Get.snackbar(
         'Error',
@@ -2299,8 +2315,7 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
 
   Future<void> _createAttendanceAndNavigate(Classrooms classroom) async {
     final attendanceController = Get.find<AttendanceController>();
-    final settings = attendanceController.attendanceSettings.value?.data?.settings;
-    final settingsId = settings?.id;
+    final settingsId = attendanceController.selectedOrFirstSetting?.id;
     if (settingsId == null || settingsId.isEmpty) {
       Get.snackbar(
         'Error',
@@ -2603,18 +2618,29 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: Obx(() => Text(
-                            _getBottomSheetTitle(widget.selectedService.value),
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Theme.of(context).colorScheme.onSurface,
-                              height: 1.3,
-                              letterSpacing: 0.2,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 2,
-                          )),
+                      child: Obx(() {
+                        final service = widget.selectedService.value;
+                        final String title;
+                        if (service == 'attendance') {
+                          title = _showClassListForCreateSheet
+                              ? 'Select attendance and class'
+                              : 'Choose Attendance Mode';
+                        } else {
+                          title = _getBottomSheetTitle(service);
+                        }
+                        return Text(
+                          title,
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            height: 1.3,
+                            letterSpacing: 0.2,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                        );
+                      }),
                     ),
                   ],
                 ),

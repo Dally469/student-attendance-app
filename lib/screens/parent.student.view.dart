@@ -817,8 +817,8 @@ class _ParentFeeDetailsScreenState extends State<ParentFeeDetailsScreen> {
                                         feeSummary.totalPaid ?? 0.0,
                                         whiteColor),
                                     _buildSummaryItem(
-                                        'Outstanding',
-                                        feeSummary.totalOutstanding ?? 0.0,
+                                        'Charges per transfer',
+                                        (feeSummary.totalOutstanding ?? 0.0).abs(),
                                         whiteColor),
                                   ],
                                 ),
@@ -1149,7 +1149,7 @@ class _ParentFeeDetailsScreenState extends State<ParentFeeDetailsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: _buildFeeDetailItem(
-                    'Outstanding', fee.amountOutstanding ?? 0.0, Colors.orange),
+                    'Charges per transfer', (fee.amountOutstanding ?? 0.0).abs(), Colors.orange),
               ),
             ],
           ),
@@ -1216,7 +1216,7 @@ class _ParentFeeDetailsScreenState extends State<ParentFeeDetailsScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            ...fee.payments!.map((payment) => _buildPaymentItem(payment)),
+            ...fee.payments!.map((payment) => _buildPaymentItem(payment, amountDue: fee.amountDue)),
           ],
         ],
       ),
@@ -1258,7 +1258,8 @@ class _ParentFeeDetailsScreenState extends State<ParentFeeDetailsScreen> {
     );
   }
 
-  Widget _buildPaymentItem(Payment payment) {
+  Widget _buildPaymentItem(Payment payment, {double? amountDue}) {
+    final displayAmount = amountDue ?? payment.amount ?? 0.0;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -1274,7 +1275,7 @@ class _ParentFeeDetailsScreenState extends State<ParentFeeDetailsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${NumberFormat.currency(symbol: '', decimalDigits: 2).format(payment.amount ?? 0.0)}',
+                '${NumberFormat.currency(symbol: '', decimalDigits: 2).format(displayAmount)}',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,

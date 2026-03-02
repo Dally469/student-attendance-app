@@ -94,10 +94,21 @@ class StudentAttendanceResponse {
     success = json['success'];
     message = json['message'];
     if (json['data'] != null) {
-      data = <StudentAttendanceRecord>[];
-      json['data'].forEach((v) {
-        data!.add(StudentAttendanceRecord.fromJson(v));
-      });
+      final dataRaw = json['data'];
+      if (dataRaw is List) {
+        data = dataRaw
+            .map((v) => StudentAttendanceRecord.fromJson(v as Map<String, dynamic>))
+            .toList();
+      } else if (dataRaw is Map<String, dynamic>) {
+        // Paginated response: data has attendanceRecords list
+        final list = dataRaw['attendanceRecords'] as List?;
+        data = list
+                ?.map((v) => StudentAttendanceRecord.fromJson(v as Map<String, dynamic>))
+                .toList() ??
+            <StudentAttendanceRecord>[];
+      } else {
+        data = <StudentAttendanceRecord>[];
+      }
     }
   }
 
