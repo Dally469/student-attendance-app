@@ -10,7 +10,7 @@ Use this document when filling out **App Store Connect** (name, description, key
 |-------|--------|
 | **App name** | Attendance *(or your preferred name, e.g. "School Attendance")* |
 | **Subtitle** (max 30 characters) | Student attendance & school communication |
-| **Bundle ID** | Use the same as in Xcode (`ios/Runner.xcodeproj` or project settings) |
+| **Bundle ID** | `com.ebridge.ios` (set in `ios/Runner.xcodeproj`) |
 
 ---
 

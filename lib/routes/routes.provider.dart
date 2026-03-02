@@ -72,6 +72,7 @@ class AppNavigation {
           classroomId: params['classroomId'] ?? '',
           classroom: params['classroom'] ?? '',
           attendanceId: params['attendanceId'] ?? '',
+          eventId: params['eventId'],
         );
       },
     ),

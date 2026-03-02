@@ -20,12 +20,14 @@ class AttendancePage extends StatefulWidget {
   final String? classroomId;
   final String? classroom;
   final String? attendanceId;
+  final String? eventId;
 
   const AttendancePage({
     Key? key,
     this.classroomId,
     this.classroom,
     this.attendanceId,
+    this.eventId,
   }) : super(key: key);
 
   @override
@@ -85,8 +87,16 @@ class _AttendancePageState extends State<AttendancePage>
     // This will set _selectedAttendanceId if not already set
     _checkAndSelectAttendance();
 
-    // Fetch students data using GetX controller
-    if (widget.classroom != null && widget.classroom!.isNotEmpty) {
+    // Fetch students: for event use attendance students endpoint; for classroom use filter by classroom
+    final isEvent = widget.classroomId == null ||
+        widget.classroomId!.isEmpty ||
+        widget.classroom == 'School-wide (Event)';
+    if (isEvent &&
+        widget.attendanceId != null &&
+        widget.attendanceId!.isNotEmpty) {
+      _classroomStudentController
+          .getStudentsByAttendanceId(widget.attendanceId!);
+    } else if (widget.classroom != null && widget.classroom!.isNotEmpty) {
       _classroomStudentController.getStudentsByClassroomId(widget.classroom!);
     }
 
@@ -292,23 +302,92 @@ class _AttendancePageState extends State<AttendancePage>
 
               print('Card detected: $cardId');
 
-              // Get student ID from card ID
-              final studentId = await getStudentIdFromCard(
-                  widget.classroom.toString(), cardId);
+              // Get student from card (need full student for event to get studentCode)
+              final studentData = await _classroomStudentController
+                  .getStudentByCardId(widget.classroom.toString(), cardId,
+                      attendanceId: widget.attendanceId);
 
-              if (studentId != null) {
+              if (studentData != null) {
+                final isEvent =
+                    widget.eventId != null && widget.eventId!.isNotEmpty;
+
+                if (isEvent) {
+                  // Event attendance: POST /api/attendance/scan/card
+                  // Option B: attendanceId (today's sheet from step 1) + studentCode (or code, cardId, etc.)
+                  final studentCode = studentData.code ?? '';
+                  final attendanceIdToUse =
+                      _selectedAttendanceId ?? widget.attendanceId;
+                  if (attendanceIdToUse == null || attendanceIdToUse.isEmpty) {
+                    await NfcManager.instance.stopSession();
+                    Get.snackbar(
+                      'Error',
+                      'No attendance session.',
+                      backgroundColor: Colors.red,
+                      colorText: Colors.white,
+                      duration: const Duration(seconds: 2),
+                    );
+                    await Future.delayed(const Duration(milliseconds: 1500));
+                    if (continuousScanning && mounted) startNfcSession();
+                    return;
+                  }
+                  if (studentCode.isEmpty) {
+                    await NfcManager.instance.stopSession();
+                    Get.snackbar(
+                      'Error',
+                      'Student has no registration number',
+                      backgroundColor: Colors.red,
+                      colorText: Colors.white,
+                      duration: const Duration(seconds: 2),
+                    );
+                    await Future.delayed(const Duration(milliseconds: 1500));
+                    if (continuousScanning && mounted) startNfcSession();
+                    return;
+                  }
+                  final ok = await _attendanceController.scanCardForEvent(
+                    attendanceId: attendanceIdToUse,
+                    eventId: widget.eventId,
+                    studentCode: studentCode,
+                    cardId: cardId.isNotEmpty ? cardId : null,
+                  );
+                  await NfcManager.instance.stopSession();
+                  HapticFeedback.mediumImpact();
+                  if (ok) {
+                    Get.snackbar(
+                      'Recorded',
+                      _attendanceController.successMessage.value,
+                      backgroundColor: Colors.green,
+                      colorText: Colors.white,
+                      duration: const Duration(seconds: 2),
+                    );
+                  } else {
+                    Get.snackbar(
+                      'Error',
+                      _attendanceController.errorMessage.value,
+                      backgroundColor: Colors.red,
+                      colorText: Colors.white,
+                      duration: const Duration(seconds: 2),
+                    );
+                  }
+                  await Future.delayed(const Duration(milliseconds: 1500));
+                  if (continuousScanning && mounted) startNfcSession();
+                  return;
+                }
+
+                // Student attendance (classroom): use check-in/check-out
+                final studentId = studentData.id;
+                if (studentId == null || studentId.isEmpty) {
+                  await NfcManager.instance.stopSession();
+                  if (continuousScanning && mounted) startNfcSession();
+                  return;
+                }
                 print('Found student with ID: $studentId');
 
-                // Check if already checked in
                 final alreadyCheckedIn =
                     _attendanceController.checkedInStudents.contains(studentId);
-
-                // Use selected attendance ID or fallback to widget attendanceId
                 final attendanceIdToUse =
                     _selectedAttendanceId ?? widget.attendanceId;
 
                 if (attendanceIdToUse == null || attendanceIdToUse.isEmpty) {
-                  // Show error but continue scanning
                   Get.snackbar(
                     'Error',
                     'No attendance session selected. Please wait...',
@@ -316,24 +395,19 @@ class _AttendancePageState extends State<AttendancePage>
                     colorText: Colors.white,
                     duration: const Duration(seconds: 2),
                   );
-                  // Stop and restart session to continue scanning
                   await NfcManager.instance.stopSession();
                   await Future.delayed(const Duration(milliseconds: 1000));
-                  if (continuousScanning && mounted) {
-                    startNfcSession();
-                  }
+                  if (continuousScanning && mounted) startNfcSession();
                   return;
                 }
 
                 if (alreadyCheckedIn) {
-                  // Perform check-out (the controller handles this automatically)
                   await _attendanceController.checkInStudent(
                     studentId: studentId,
                     classroomId: widget.classroomId.toString(),
                     attendanceId: attendanceIdToUse,
                   );
                 } else {
-                  // Perform check-in
                   await _attendanceController.checkInStudent(
                     studentId: studentId,
                     classroomId: widget.classroomId.toString(),
@@ -341,19 +415,10 @@ class _AttendancePageState extends State<AttendancePage>
                   );
                 }
 
-                // Temporarily stop the session to give feedback
                 await NfcManager.instance.stopSession();
-
-                // Vibrate to give tactile feedback
                 HapticFeedback.mediumImpact();
-
-                // Give the system a short break to process and show feedback
                 await Future.delayed(const Duration(milliseconds: 1500));
-
-                // Restart the NFC session for continuous scanning
-                if (continuousScanning && mounted) {
-                  startNfcSession();
-                }
+                if (continuousScanning && mounted) startNfcSession();
               } else {
                 // Card not registered to any student
                 // Temporarily stop the session to give feedback
@@ -443,32 +508,29 @@ class _AttendancePageState extends State<AttendancePage>
     }
   }
 
-  // Function to get student ID from card ID
-  Future<String?> getStudentIdFromCard(String classroom, String cardId) async {
+  // Function to get student ID from card ID. Pass attendanceId for event mode to avoid classroom filter.
+  Future<String?> getStudentIdFromCard(String classroom, String cardId,
+      {String? attendanceId}) async {
     try {
-      // First try to get it from the controller
-      final studentData = await _classroomStudentController.getStudentByCardId(
-          classroom, cardId);
-      if (studentData != null) {
-        return studentData.id;
-      }
+      final studentData = await _classroomStudentController
+          .getStudentByCardId(classroom, cardId, attendanceId: attendanceId);
+      if (studentData != null) return studentData.id;
 
-      // If not found in controller, try fallback methods
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/students.json');
-
-      if (await file.exists()) {
-        final jsonString = await file.readAsString();
-        final List<dynamic> students = jsonDecode(jsonString);
-
-        for (var student in students) {
-          if (student['cardId'] == cardId &&
-              student['classroom'] == classroom) {
-            return student['id'];
+      // If not found in controller, try fallback file (only for non-event)
+      if (attendanceId == null || attendanceId.isEmpty) {
+        final directory = await getApplicationDocumentsDirectory();
+        final file = File('${directory.path}/students.json');
+        if (await file.exists()) {
+          final jsonString = await file.readAsString();
+          final List<dynamic> studentsList = jsonDecode(jsonString);
+          for (var student in studentsList) {
+            if (student['cardId'] == cardId &&
+                student['classroom'] == classroom) {
+              return student['id'];
+            }
           }
         }
       }
-
       return null;
     } catch (e) {
       debugPrint('Error getting student ID: $e');

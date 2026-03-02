@@ -4,6 +4,7 @@ import 'package:attendance/api/attendance.service.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/attendance.dart';
+import '../models/attendance.settings.model.dart';
 import '../models/check_in.dart';
 
 class AttendanceController extends GetxController {
@@ -24,6 +25,18 @@ class AttendanceController extends GetxController {
   final RxString lastCheckedInStudentCode = ''.obs;
   final RxInt checkInCount = RxInt(0);
   final RxSet<String> checkedInStudents = <String>{}.obs;
+  final Rx<AttendanceSettingsResponse?> attendanceSettings =
+      Rx<AttendanceSettingsResponse?>(null);
+  final RxBool isLoadingSettings = false.obs;
+  /// Selected event id for attendance; null = use default school settings.
+  final Rx<String?> selectedAttendanceEventId = Rx<String?>(null);
+
+  // Record Attendance bottom sheet: choose Event or Student Attendance
+  /// Record Attendance flow: 'none' (choose type), 'event', or 'student'.
+  final RxString recordAttendanceMode = 'none'.obs;
+  /// Events from GET api/attendance/events (for event attendance).
+  final RxList<AttendanceEvent> attendanceEventsList = <AttendanceEvent>[].obs;
+  final RxBool isLoadingEvents = false.obs;
 
   // Helper method to safely get attendance ID
   String getAttendanceId() {
@@ -65,6 +78,116 @@ class AttendanceController extends GetxController {
       print('Error loading current attendance students: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> fetchAttendanceSettings() async {
+    try {
+      isLoadingSettings.value = true;
+      attendanceSettings.value = null;
+      final response = await _attendanceService.getAttendanceSettings();
+      attendanceSettings.value = response.success == true ? response : null;
+    } catch (e) {
+      attendanceSettings.value = null;
+    } finally {
+      isLoadingSettings.value = false;
+    }
+  }
+
+  /// Reset Record Attendance flow choice (call when opening the bottom sheet).
+  void resetRecordAttendanceMode() {
+    recordAttendanceMode.value = 'none';
+    selectedAttendanceEventId.value = null;
+    attendanceEventsList.clear();
+  }
+
+  /// Fetch events from GET api/attendance/events for event attendance.
+  Future<void> fetchAttendanceEvents() async {
+    try {
+      isLoadingEvents.value = true;
+      attendanceEventsList.clear();
+      final response = await _attendanceService.getAttendanceEvents();
+      if (response.success == true && response.data != null) {
+        attendanceEventsList.assignAll(response.data!);
+      }
+    } catch (e) {
+      attendanceEventsList.clear();
+    } finally {
+      isLoadingEvents.value = false;
+    }
+  }
+
+  /// Create event sheet via POST /api/attendance/event/sheet — returns session id.
+  /// Sends mode, eventId, eventName, date (YYYY-MM-DD).
+  Future<bool> createEventSheet(String eventId, String eventName) async {
+    if (eventId.isEmpty) return false;
+    try {
+      isCreatingAttendance.value = true;
+      errorMessage.value = '';
+      attendanceId.value = '';
+      currentAttendance.value = null;
+
+      final date = _formatDate(DateTime.now());
+      final result = await _attendanceService.createEventSheet(
+        eventId: eventId,
+        eventName: eventName,
+        date: date,
+      );
+
+      if (result.success == true && result.data != null && result.data!.id != null) {
+        currentAttendance.value = result;
+        attendanceId.value = result.data!.id!;
+        successMessage.value = result.message ?? 'Event sheet created';
+        return true;
+      }
+      errorMessage.value = result.message ?? 'Failed to create event sheet';
+      return false;
+    } catch (e) {
+      errorMessage.value = 'Error: $e';
+      return false;
+    } finally {
+      isCreatingAttendance.value = false;
+    }
+  }
+
+  /// Create attendance via POST /api/attendance/create (event or settings path).
+  /// Event: eventId + date only (school-wide). Settings: settingsId + classroomId + date.
+  Future<bool> createAttendanceBySettingsOrEvent({
+    String? eventId,
+    String? settingsId,
+    String? classroomId,
+  }) async {
+    try {
+      isCreatingAttendance.value = true;
+      errorMessage.value = '';
+      successMessage.value = '';
+      attendanceId.value = '';
+      currentAttendance.value = null;
+
+      final date = _formatDate(DateTime.now());
+      final result = await _attendanceService.createAttendanceBySettingsOrEvent(
+        eventId: eventId,
+        settingsId: settingsId,
+        classroomId: classroomId,
+        date: date,
+      );
+
+      if (result.success == true && result.data != null) {
+        currentAttendance.value = result;
+        if (result.data!.id != null && result.data!.id!.isNotEmpty) {
+          attendanceId.value = result.data!.id!;
+        }
+        successMessage.value = result.message ?? 'Attendance created';
+        return true;
+      } else {
+        errorMessage.value = result.message ?? 'Failed to create attendance';
+        return false;
+      }
+    } catch (e) {
+      errorMessage.value = 'Error: $e';
+      return false;
+    } finally {
+      isCreatingAttendance.value = false;
     }
   }
 
@@ -517,6 +640,75 @@ class AttendanceController extends GetxController {
       print('Exception in checkInStudent: $e');
       errorMessage.value = 'An error occurred: $e';
       print('Error: ${errorMessage.value}');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Event attendance: scan by card — POST /api/attendance/scan/card
+  /// Option B: attendanceId (today's sheet) + studentCode. Option A: eventId + studentCode.
+  /// Can also pass code, regNumber, cardId, cardNumber if available from scan.
+  Future<bool> scanCardForEvent({
+    String? attendanceId,
+    String? eventId,
+    String? studentCode,
+    String? code,
+    String? regNumber,
+    String? cardId,
+    String? cardNumber,
+  }) async {
+    if ((studentCode?.isEmpty ?? true) &&
+        (code?.isEmpty ?? true) &&
+        (regNumber?.isEmpty ?? true) &&
+        (cardId?.isEmpty ?? true) &&
+        (cardNumber?.isEmpty ?? true)) return false;
+    if ((attendanceId == null || attendanceId.isEmpty) &&
+        (eventId == null || eventId.isEmpty)) return false;
+    try {
+      isLoading.value = true;
+      errorMessage.value = '';
+      successMessage.value = '';
+
+      final result = await _attendanceService.scanCardForEvent(
+        attendanceId: attendanceId,
+        eventId: eventId,
+        studentCode: studentCode,
+        code: code,
+        regNumber: regNumber,
+        cardId: cardId,
+        cardNumber: cardNumber,
+      );
+
+      if (result.success == true) {
+        successMessage.value = result.message ?? 'Attendance recorded';
+        lastCheckedInStudentName.value = result.data?.studentName ?? '';
+        lastCheckedInStudentCode.value =
+            result.data?.studentId ?? studentCode ?? '';
+        checkInModel.value = CheckInModel(
+          statusCode: result.status,
+          success: result.success,
+          message: result.message,
+          data: result.data != null
+              ? CheckInData(
+                  id: result.data?.id,
+                  studentId: result.data?.studentId,
+                  studentName: result.data?.studentName,
+                  checkInTime: result.data?.checkInTime,
+                  checkOutTime: result.data?.checkOutTime,
+                  status: result.data?.status,
+                  attendanceId: result.data?.attendanceId,
+                  deviceType: result.data?.deviceType,
+                  deviceIdentifier: result.data?.deviceIdentifier,
+                )
+              : null,
+        );
+        return true;
+      }
+      errorMessage.value = result.message ?? 'Scan failed';
+      return false;
+    } catch (e) {
+      errorMessage.value = 'Error: $e';
+      return false;
     } finally {
       isLoading.value = false;
     }

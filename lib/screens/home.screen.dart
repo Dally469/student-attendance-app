@@ -4,6 +4,7 @@ import 'package:attendance/controllers/attendance_controller.dart';
 import 'package:attendance/controllers/school_classroom_controller.dart';
 import 'package:attendance/controllers/school_fees_controller.dart';
 import 'package:attendance/controllers/sms.controller.dart';
+import 'package:attendance/models/attendance.settings.model.dart';
 import 'package:attendance/models/classroom.model.dart';
 import 'package:attendance/models/school.fee.type.dart';
 import 'package:attendance/models/student.model.dart';
@@ -1458,6 +1459,7 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
   late AnimationController _animationController;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  bool _showClassListForCreateSheet = false;
 
   @override
   void initState() {
@@ -1477,6 +1479,19 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
         _searchController.text = query;
       }
     });
+
+    // When opening Record Attendance: keep previous choice so "next session" uses same endpoint
+    // (event → POST event/sheet + scan/card; student → create by settings/classroom).
+    // Use "Change" in the sheet to switch type. Fetch settings for Student path.
+    if (widget.selectedService.value == 'attendance') {
+      Get.find<AttendanceController>().fetchAttendanceSettings();
+      // If mode is event but events list is empty, re-fetch events (e.g. after app restart)
+      final ctrl = Get.find<AttendanceController>();
+      if (ctrl.recordAttendanceMode.value == 'event' &&
+          ctrl.attendanceEventsList.isEmpty) {
+        ctrl.fetchAttendanceEvents();
+      }
+    }
   }
 
   @override
@@ -1487,6 +1502,407 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
     // Clear search when bottom sheet closes
     widget.schoolClassroomController.clearSearch();
     super.dispose();
+  }
+
+  Widget _buildAttendanceSettingsSection() {
+    final AttendanceController ctrl = Get.find<AttendanceController>();
+    return Obx(() {
+      final mode = ctrl.recordAttendanceMode.value;
+
+      // Step 1: Choose Event vs Student Attendance
+      if (mode == 'none') {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'How do you want to record attendance?',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildSettingsCard(
+                attendanceController: ctrl,
+                isSelected: false,
+                title: 'Event',
+                subtitle: 'School-wide event (e.g. assembly, dormitory)',
+                icon: Icons.event_note,
+                onTap: () {
+                  ctrl.recordAttendanceMode.value = 'event';
+                  ctrl.fetchAttendanceEvents();
+                },
+              ),
+              const SizedBox(height: 10),
+              _buildSettingsCard(
+                attendanceController: ctrl,
+                isSelected: false,
+                title: 'Student Attendance',
+                subtitle: 'By classroom (check-in / check-out)',
+                icon: Icons.school_outlined,
+                onTap: () {
+                  ctrl.recordAttendanceMode.value = 'student';
+                },
+              ),
+            ],
+          ),
+        );
+      }
+
+      // Step 2a: Event — show events from api/attendance/events
+      if (mode == 'event') {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: () => ctrl.resetRecordAttendanceMode(),
+                    icon: const Icon(Icons.arrow_back, size: 18),
+                    label: const Text('Change'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                'Choose an event',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (ctrl.isLoadingEvents.value)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12.0),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: primaryColor,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Loading events...',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (ctrl.attendanceEventsList.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text(
+                    'No events available.',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else
+                ...ctrl.attendanceEventsList.map((event) {
+                  final isSelected =
+                      ctrl.selectedAttendanceEventId.value == event.id;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10.0),
+                    child: _buildSettingsCard(
+                      attendanceController: ctrl,
+                      isSelected: isSelected,
+                      title: event.name ?? 'Event',
+                      subtitle:
+                          '${event.startDate ?? ''} – ${event.endDate ?? ''}',
+                      icon: Icons.event_note,
+                      onTap: () =>
+                          ctrl.selectedAttendanceEventId.value = event.id,
+                    ),
+                  );
+                }),
+              if (ctrl.attendanceEventsList.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildCreateSheetButton(isEvent: true),
+              ],
+            ],
+          ),
+        );
+      }
+
+      // Step 2b: Student Attendance — show default school settings only
+      if (mode == 'student') {
+        if (ctrl.isLoadingSettings.value) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: primaryColor,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Loading attendance settings...',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        final settings =
+            ctrl.attendanceSettings.value?.data?.settings;
+        if (settings == null) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Text(
+              'No attendance settings found.',
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: () => ctrl.resetRecordAttendanceMode(),
+                    icon: const Icon(Icons.arrow_back, size: 18),
+                    label: const Text('Change'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                'Choose which settings to use',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _buildSettingsCard(
+                attendanceController: ctrl,
+                isSelected: true,
+                title: 'Default school settings',
+                subtitle: _defaultSettingsSubtitle(settings),
+                icon: Icons.settings_outlined,
+                onTap: () {},
+              ),
+              const SizedBox(height: 16),
+              _buildCreateSheetButton(isEvent: false),
+            ],
+          ),
+        );
+      }
+
+      return const SizedBox.shrink();
+    });
+  }
+
+  Widget _buildCreateSheetButton({required bool isEvent}) {
+    final ctrl = Get.find<AttendanceController>();
+    return Obx(() {
+      final isCreating = ctrl.isCreatingAttendance.value;
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: isCreating
+              ? null
+              : () async {
+                  if (isEvent) {
+                    final eventIdToSend = ctrl.selectedAttendanceEventId.value;
+                    if (eventIdToSend == null || eventIdToSend.isEmpty) {
+                      Get.snackbar(
+                        'Error',
+                        'Please select an event first.',
+                        backgroundColor: Colors.red,
+                        colorText: Colors.white,
+                        snackPosition: SnackPosition.BOTTOM,
+                      );
+                      return;
+                    }
+                    final selectedEvent = ctrl.attendanceEventsList
+                        .firstWhereOrNull((e) => e.id == eventIdToSend);
+                    final eventName = selectedEvent?.name ?? 'Event';
+                    final ok = await ctrl.createEventSheet(
+                        eventIdToSend, eventName);
+                    if (!mounted) return;
+                    if (ok && ctrl.attendanceId.value.isNotEmpty) {
+                      Navigator.pop(context);
+                      Get.toNamed(makeAttendance, parameters: {
+                        'classroomId': '',
+                        'classroom': 'School-wide (Event)',
+                        'attendanceId': ctrl.attendanceId.value,
+                        'eventId': eventIdToSend,
+                      });
+                    } else {
+                      Get.snackbar(
+                        'Error',
+                        ctrl.errorMessage.value.isNotEmpty
+                            ? ctrl.errorMessage.value
+                            : 'Failed to create attendance',
+                        backgroundColor: Colors.red,
+                        colorText: Colors.white,
+                        snackPosition: SnackPosition.BOTTOM,
+                      );
+                    }
+                  } else {
+                    setState(() => _showClassListForCreateSheet = true);
+                  }
+                },
+          icon: isCreating
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.add_chart, size: 20),
+          label: Text(
+            isCreating ? 'Recording...' : 'Record attendance',
+            style: GoogleFonts.poppins(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 2,
+            shadowColor: primaryColor.withOpacity(0.3),
+          ),
+        ),
+      );
+    });
+  }
+
+  String _defaultSettingsSubtitle(AttendanceSetting settings) {
+    final parts = <String>[];
+    if (settings.attendanceMode != null) parts.add(settings.attendanceMode!);
+    if (settings.deviceType != null) parts.add(settings.deviceType!);
+    if (settings.attendanceStartTime != null && settings.attendanceEndTime != null) {
+      parts.add('${settings.attendanceStartTime!} – ${settings.attendanceEndTime!}');
+    }
+    return parts.isEmpty ? 'School-wide settings' : parts.join(' · ');
+  }
+
+  Widget _buildSettingsCard({
+    required AttendanceController attendanceController,
+    required bool isSelected,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? primaryColor.withOpacity(0.12)
+                : Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? primaryColor : primaryColor.withOpacity(0.2),
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? primaryColor.withOpacity(0.2)
+                      : Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  size: 22,
+                  color: isSelected ? primaryColor : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (isSelected)
+                Icon(Icons.check_circle, color: primaryColor, size: 24),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildClassroomList() {
@@ -1648,6 +2064,93 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
     return Expanded(
       child: Column(
         children: [
+          // "All classrooms" option for CHECK_IN_OUT when creating attendance sheet
+          Obx(() {
+            if (widget.selectedService.value != 'attendance' ||
+                !_showClassListForCreateSheet) {
+              return const SizedBox.shrink();
+            }
+            final mode = Get.find<AttendanceController>()
+                .attendanceSettings
+                .value
+                ?.data
+                ?.settings
+                ?.attendanceMode;
+            if (mode != 'CHECK_IN_OUT') return const SizedBox.shrink();
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    await _createAttendanceForAllClassroomsAndNavigate();
+                    if (!mounted) return;
+                    widget.schoolClassroomController.clearSearch();
+                    _searchFocusNode.unfocus();
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: primaryColor.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.all_inclusive,
+                            size: 22,
+                            color: primaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'All classrooms',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Applies to all classrooms by default',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.arrow_forward, size: 18, color: primaryColor),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+
           // Show result count
           Obx(() {
             final filteredCount =
@@ -1751,13 +2254,103 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
     );
   }
 
+  /// Create with settingsId only (CHECK_IN_OUT → all classrooms). No classroomId.
+  Future<void> _createAttendanceForAllClassroomsAndNavigate() async {
+    final attendanceController = Get.find<AttendanceController>();
+    final settings = attendanceController.attendanceSettings.value?.data?.settings;
+    final settingsId = settings?.id;
+    if (settingsId == null || settingsId.isEmpty) {
+      Get.snackbar(
+        'Error',
+        'Settings not found. Please try again.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final ok = await attendanceController.createAttendanceBySettingsOrEvent(
+      settingsId: settingsId,
+      classroomId: null,
+    );
+
+    if (!mounted) return;
+
+    if (ok && attendanceController.attendanceId.value.isNotEmpty) {
+      Navigator.pop(context);
+      Get.toNamed(makeAttendance, parameters: {
+        'classroomId': '',
+        'classroom': 'All classrooms',
+        'attendanceId': attendanceController.attendanceId.value,
+      });
+    } else {
+      Get.snackbar(
+        'Error',
+        attendanceController.errorMessage.value.isNotEmpty
+            ? attendanceController.errorMessage.value
+            : 'Failed to create attendance',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  Future<void> _createAttendanceAndNavigate(Classrooms classroom) async {
+    final attendanceController = Get.find<AttendanceController>();
+    final settings = attendanceController.attendanceSettings.value?.data?.settings;
+    final settingsId = settings?.id;
+    if (settingsId == null || settingsId.isEmpty) {
+      Get.snackbar(
+        'Error',
+        'Settings not found. Please try again.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final ok = await attendanceController.createAttendanceBySettingsOrEvent(
+      settingsId: settingsId,
+      classroomId: classroom.id ?? '',
+    );
+
+    if (!mounted) return;
+
+    if (ok && attendanceController.attendanceId.value.isNotEmpty) {
+      Navigator.pop(context);
+      Get.toNamed(makeAttendance, parameters: {
+        'classroomId': classroom.id ?? '',
+        'classroom': classroom.name ?? '',
+        'attendanceId': attendanceController.attendanceId.value,
+      });
+    } else {
+      Get.snackbar(
+        'Error',
+        attendanceController.errorMessage.value.isNotEmpty
+            ? attendanceController.errorMessage.value
+            : 'Failed to create attendance',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
   Widget _buildClassroomCard(Classrooms classroom, String service) {
+    final isCreateSheetFlow = service == 'attendance' && _showClassListForCreateSheet;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: InkWell(
-        onTap: () {
-          widget.onClassroomSelected(classroom);
-          // Clear search and close keyboard on selection
+        onTap: () async {
+          if (isCreateSheetFlow) {
+            await _createAttendanceAndNavigate(classroom);
+          } else {
+            widget.onClassroomSelected(classroom);
+          }
+          if (!mounted) return;
           widget.schoolClassroomController.clearSearch();
           _searchFocusNode.unfocus();
         },
@@ -2028,8 +2621,20 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
               ),
               const SizedBox(height: 16),
 
-              // Search field - only show if there are classrooms
+              // School attendance settings (when Record Attendance)
               Obx(() {
+                if (widget.selectedService.value != 'attendance') {
+                  return const SizedBox.shrink();
+                }
+                return _buildAttendanceSettingsSection();
+              }),
+
+              // Search field and class list - hidden for Record Attendance until "Record attendance" is tapped
+              Obx(() {
+                final isAttendance = widget.selectedService.value == 'attendance';
+                if (isAttendance && !_showClassListForCreateSheet) {
+                  return const SizedBox.shrink();
+                }
                 if (widget.schoolClassroomController.classrooms.isEmpty &&
                     !widget.schoolClassroomController.isLoading.value) {
                   return const SizedBox.shrink();
@@ -2037,10 +2642,22 @@ class _ClassroomBottomSheetState extends State<_ClassroomBottomSheet>
                 return _buildSearchField();
               }),
 
-              const SizedBox(height: 8),
+              Obx(() {
+                final isAttendance = widget.selectedService.value == 'attendance';
+                if (isAttendance && !_showClassListForCreateSheet) {
+                  return const SizedBox.shrink();
+                }
+                return const SizedBox(height: 8);
+              }),
 
-              // Classroom list
-              _buildClassroomList(),
+              // Classroom list - hidden for Record Attendance until "Record attendance" is tapped
+              Obx(() {
+                final isAttendance = widget.selectedService.value == 'attendance';
+                if (isAttendance && !_showClassListForCreateSheet) {
+                  return const SizedBox.shrink();
+                }
+                return _buildClassroomList();
+              }),
             ],
           ),
         );

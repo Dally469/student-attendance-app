@@ -85,14 +85,14 @@ class StudentData {
       this.cardAvailable});
 
   StudentData.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
+    id = json['id'] ?? json['studentId'];
     code = json['code'];
     name = json['name'];
     gender = json['gender'];
     parentContact = json['parentContact'];
     level = json['level'];
     classroomId = json['classroom_id'];
-    classroom = json['classroom'];
+    classroom = json['classroom'] ?? json['classroomName'];
     departmentId = json['department_id'];
     department = json['department'];
     profileImage = json['profileImage'];

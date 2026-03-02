@@ -1,9 +1,11 @@
 import 'package:attendance/api/auth.service.dart';
+import 'package:attendance/api/attendance.service.dart';
 import 'package:attendance/models/student.model.dart';
 import 'package:get/get.dart';
 
 class ClassroomStudentController extends GetxController {
   final AuthService _authService = AuthService();
+  final AttendanceService _attendanceService = AttendanceService();
 
   // Observable variables
   final RxBool isLoading = false.obs;
@@ -63,6 +65,32 @@ class ClassroomStudentController extends GetxController {
     _searchWorker?.dispose();
     _studentsWorker?.dispose();
     super.onClose();
+  }
+
+  /// Fetches students for an event attendance via GET /api/attendance/{attendanceId}/students.
+  /// Use this when attendance is event-based (no classroom filter).
+  Future<void> getStudentsByAttendanceId(String attendanceId) async {
+    if (attendanceId.isEmpty) return;
+    try {
+      isLoading.value = true;
+      errorMessage.value = '';
+
+      final result =
+          await _attendanceService.getAttendanceStudents(attendanceId);
+      if (result.success == true) {
+        students.assignAll(result.data ?? []);
+        students.sort((a, b) => (a.name ?? '')
+            .toLowerCase()
+            .compareTo((b.name ?? '').toLowerCase()));
+        Future.microtask(() => _updateFilteredList());
+      } else {
+        errorMessage.value = result.message ?? 'Failed to fetch students';
+      }
+    } catch (e) {
+      errorMessage.value = 'An error occurred while fetching students: $e';
+    } finally {
+      Future.microtask(() => isLoading.value = false);
+    }
   }
 
   // Function to fetch students by classroom ID
@@ -218,21 +246,27 @@ class ClassroomStudentController extends GetxController {
     }
   }
 
-  // Function to get student by card ID
+  /// Gets student by card ID. For event attendance pass [attendanceId] so refetch
+  /// uses GET attendance/students instead of POST filter/classroom with "School-wide (Event)".
   Future<StudentData?> getStudentByCardId(
-      String classroom, String cardId) async {
+    String classroom,
+    String cardId, {
+    String? attendanceId,
+  }) async {
     try {
       if (students.isNotEmpty) {
-        final student = students.firstWhereOrNull(
-            (student) => student.cardId == cardId && student.cardId != null);
-        if (student != null) {
-          return student;
-        }
+        final student = students.firstWhereOrNull((s) =>
+            s.cardId == cardId && s.cardId != null && s.cardId!.isNotEmpty);
+        if (student != null) return student;
       }
 
-      await getStudentsByClassroomId(classroom);
-      return students.firstWhereOrNull(
-          (student) => student.cardId == cardId && student.cardId != null);
+      if (attendanceId != null && attendanceId.isNotEmpty) {
+        await getStudentsByAttendanceId(attendanceId);
+      } else {
+        await getStudentsByClassroomId(classroom);
+      }
+      return students.firstWhereOrNull((s) =>
+          s.cardId == cardId && s.cardId != null && s.cardId!.isNotEmpty);
     } catch (e) {
       errorMessage.value = 'Error finding student by card ID: $e';
       return null;

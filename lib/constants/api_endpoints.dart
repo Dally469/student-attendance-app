@@ -29,12 +29,19 @@ class ApiEndpoints {
       '$baseUrl/api/attendance/classroom/$classroomId';
   static String getAttendance(String attendanceId) =>
       '$baseUrl/api/attendance/$attendanceId';
+  static String attendanceStudents(String attendanceId) =>
+      '$baseUrl/api/attendance/$attendanceId/students';
   static String get studentAttendanceCheckIn =>
       '$baseUrl/api/student-attendance/check-in';
   static String get attendanceCheckOut => '$baseUrl/api/attendance/check-out';
   static String attendanceByClassroomAndDate(String classroomId, String date) =>
       '$baseUrl/api/attendance/classroom/$classroomId/date?date=$date';
   static String get attendanceSync => '$baseUrl/api/attendance/sync';
+  static String get attendanceSettings => '$baseUrl/api/attendance/settings';
+  static String get attendanceEvents => '$baseUrl/api/attendance/events';
+  static String get attendanceCreate => '$baseUrl/api/attendance/create';
+  static String get attendanceEventSheet => '$baseUrl/api/attendance/event/sheet';
+  static String get attendanceScanCard => '$baseUrl/api/attendance/scan/card';
 
   // Payment Endpoints
   static String get payStudentFee => '$baseUrl/api/mopay/fees/pay-student';

@@ -30,11 +30,11 @@ class _AssignStudentCardState extends State<AssignStudentCard> {
       print("${widget.classroomId ?? 'Unknown ID'} - ${widget.classroom ?? 'Unknown Classroom'}");
     }
 
-    // Reset controller state
-    _studentController.reset();
-    
-    // Fetch students using GetX controller
-    _studentController.getStudentsByClassroomId(widget.classroom ?? "");
+    // Defer reset and fetch to avoid setState/markNeedsBuild during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _studentController.reset();
+      _studentController.getStudentsByClassroomId(widget.classroom ?? "");
+    });
 
     // Listen to search query changes
     ever(_studentController.searchQuery, (query) {

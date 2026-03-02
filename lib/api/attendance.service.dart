@@ -14,6 +14,9 @@ import '../models/check_in.dart';
 import '../models/offline_check_in.dart';
 import '../models/attendance_sync_request.dart';
 import '../models/student.attendance.record.dart';
+import '../models/attendance.settings.model.dart';
+import '../models/student.model.dart';
+import '../constants/api_endpoints.dart';
 
 class AttendanceService {
   // Helper method to clean token (remove JSON encoding quotes)
@@ -282,8 +285,57 @@ class AttendanceService {
     } catch (e) {
       print('Error in getAttendanceById: $e');
       return AttendanceModel(
+          success: false,
+          status: 500,
+          message: 'Error: ${e.toString()}',
+      );
+    }
+  }
+
+  /// GET /api/attendance/{attendanceId}/students - list of students for event attendance (code, classroomName for scanning)
+  Future<StudentModel> getAttendanceStudents(String attendanceId) async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('token');
+
+      if (token == null) {
+        return StudentModel(success: false, message: 'Authentication token not found');
+      }
+
+      Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': _cleanToken(token),
+      };
+
+      final uri = Uri.parse(ApiEndpoints.attendanceStudents(attendanceId));
+
+      if (kDebugMode) {
+        print('=== GET Attendance Students Request ===');
+        print('URL: $uri');
+      }
+
+      var response = await http.get(uri, headers: headers);
+
+      if (kDebugMode) {
+        print('Response Status: ${response.statusCode}');
+        print('Response Body: ${response.body}');
+        print('====================================');
+      }
+
+      Map<String, dynamic> results = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return StudentModel.fromJson(results);
+      }
+      return StudentModel(
         success: false,
-        status: 500,
+        status: response.statusCode,
+        message: results['message'] ?? 'Failed to fetch students',
+      );
+    } catch (e) {
+      if (kDebugMode) print('Error in getAttendanceStudents: $e');
+      return StudentModel(
+        success: false,
         message: 'Error: ${e.toString()}',
       );
     }
@@ -432,6 +484,376 @@ class AttendanceService {
         success: false,
         status: 500,
         message: 'Error: ${e.toString()}',
+      );
+    }
+  }
+
+  /// GET /api/attendance/settings - school attendance settings and events
+  Future<AttendanceSettingsResponse> getAttendanceSettings() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('token');
+
+      if (token == null) {
+        return AttendanceSettingsResponse(
+          status: 401,
+          success: false,
+          message: 'Authentication token not found',
+        );
+      }
+
+      Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': _cleanToken(token),
+      };
+
+      final uri = Uri.parse(ApiEndpoints.attendanceSettings);
+      var response = await http.get(uri, headers: headers);
+
+      if (response.statusCode != 200) {
+        Map<String, dynamic>? errorResults;
+        try {
+          errorResults = jsonDecode(response.body);
+        } catch (_) {}
+        return AttendanceSettingsResponse(
+          status: response.statusCode,
+          success: false,
+          message: errorResults?['message'] ?? 'Failed to fetch attendance settings',
+        );
+      }
+
+      Map<String, dynamic> results = jsonDecode(response.body);
+      return AttendanceSettingsResponse.fromJson(results);
+    } catch (e) {
+      if (kDebugMode) print('Error getAttendanceSettings: $e');
+      return AttendanceSettingsResponse(
+        status: 500,
+        success: false,
+        message: 'Error: ${e.toString()}',
+      );
+    }
+  }
+
+  /// GET /api/attendance/events - school-wide events for event attendance
+  Future<AttendanceEventsResponse> getAttendanceEvents() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('token');
+
+      if (token == null) {
+        return AttendanceEventsResponse(
+          success: false,
+          message: 'Authentication token not found',
+        );
+      }
+
+      Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': _cleanToken(token),
+      };
+
+      final uri = Uri.parse(ApiEndpoints.attendanceEvents);
+      var response = await http.get(uri, headers: headers);
+
+      if (response.statusCode != 200) {
+        Map<String, dynamic>? errorResults;
+        try {
+          errorResults = jsonDecode(response.body);
+        } catch (_) {}
+        return AttendanceEventsResponse(
+          status: response.statusCode,
+          success: false,
+          message: errorResults?['message'] ?? 'Failed to fetch events',
+        );
+      }
+
+      Map<String, dynamic> results = jsonDecode(response.body);
+      return AttendanceEventsResponse.fromJson(results);
+    } catch (e) {
+      if (kDebugMode) print('Error getAttendanceEvents: $e');
+      return AttendanceEventsResponse(
+        status: 500,
+        success: false,
+        message: 'Error: ${e.toString()}',
+      );
+    }
+  }
+
+  /// POST /api/attendance/event/sheet — create event attendance sheet, returns session id
+  /// Body: { "mode": "EVENT", "eventId", "eventName", "date" } (date YYYY-MM-DD).
+  Future<AttendanceModel> createEventSheet({
+    required String eventId,
+    required String eventName,
+    required String date,
+  }) async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('token');
+
+      if (token == null) {
+        return AttendanceModel(
+          status: 401,
+          success: false,
+          message: 'Authentication token not found',
+          data: null,
+        );
+      }
+
+      Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': _cleanToken(token),
+      };
+
+      final uri = Uri.parse(ApiEndpoints.attendanceEventSheet);
+      final body = {
+        'mode': 'EVENT',
+        'eventId': eventId,
+        'eventName': eventName,
+        'date': date,
+      };
+      final bodyJson = jsonEncode(body);
+      if (kDebugMode) {
+        print('=== [Event attendance] POST /api/attendance/event/sheet ===');
+        print('URL: $uri');
+        print('Request body: $bodyJson');
+      }
+      var response = await http.post(uri, headers: headers, body: bodyJson);
+      if (kDebugMode) {
+        print('Response status: ${response.statusCode}');
+        print('Response body: ${response.body}');
+        print('============================================================');
+      }
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        Map<String, dynamic>? err;
+        try {
+          final decoded = jsonDecode(response.body);
+          err = decoded is Map<String, dynamic> ? decoded : null;
+        } catch (_) {}
+        return AttendanceModel(
+          status: response.statusCode,
+          success: false,
+          message: err?['message'] ?? 'Failed to create event sheet',
+          data: null,
+        );
+      }
+
+      Map<String, dynamic> decoded = jsonDecode(response.body);
+      final dataMap = decoded['data'];
+      if (dataMap is Map<String, dynamic>) {
+        return AttendanceModel(
+          status: decoded['status'] ?? 200,
+          success: decoded['success'] ?? true,
+          message: decoded['message'],
+          data: Data.fromJson(dataMap),
+        );
+      }
+      if (decoded['id'] != null) {
+        return AttendanceModel(
+          status: 200,
+          success: true,
+          message: decoded['message'],
+          data: Data.fromJson(Map<String, dynamic>.from(decoded)),
+        );
+      }
+      return AttendanceModel.fromJson(decoded);
+    } catch (e) {
+      if (kDebugMode) print('Error createEventSheet: $e');
+      return AttendanceModel(
+        status: 500,
+        success: false,
+        message: 'Error: ${e.toString()}',
+        data: null,
+      );
+    }
+  }
+
+  /// POST /api/attendance/scan/card — event attendance (after creating sheet).
+  /// Headers: Authorization: Bearer <token>, Content-Type: application/json
+  /// Option A: { "eventId": "<event-uuid>", "studentCode": "..." }
+  /// Option B: { "attendanceId": "<session-uuid-from-step-1>", "studentCode": "..." }
+  /// Student identifier: can send studentCode, code, regNumber, cardId, or cardNumber.
+  Future<legacy.CheckInModel> scanCardForEvent({
+    String? attendanceId,
+    String? eventId,
+    String? studentCode,
+    String? code,
+    String? regNumber,
+    String? cardId,
+    String? cardNumber,
+  }) async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('token');
+
+      if (token == null) {
+        return legacy.CheckInModel(
+          success: false,
+          status: 401,
+          message: 'Authentication token not found',
+        );
+      }
+
+      final authToken = _cleanToken(token);
+      Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': authToken.startsWith('Bearer ') ? authToken : 'Bearer $authToken',
+      };
+
+      final uri = Uri.parse(ApiEndpoints.attendanceScanCard);
+      final Map<String, dynamic> body = {};
+      if (attendanceId != null && attendanceId.isNotEmpty) {
+        body['attendanceId'] = attendanceId;
+      }
+      if (eventId != null && eventId.isNotEmpty) {
+        body['eventId'] = eventId;
+      }
+      // Student identifier: send whichever we have (API accepts studentCode, code, regNumber, cardId, cardNumber)
+      if (studentCode != null && studentCode.isNotEmpty) body['studentCode'] = studentCode;
+      if (code != null && code.isNotEmpty) body['code'] = code;
+      if (regNumber != null && regNumber.isNotEmpty) body['regNumber'] = regNumber;
+      if (cardId != null && cardId.isNotEmpty) body['cardId'] = cardId;
+      if (cardNumber != null && cardNumber.isNotEmpty) body['cardNumber'] = cardNumber;
+      final bodyJson = jsonEncode(body);
+      if (kDebugMode) {
+        print('=== [Event attendance] POST /api/attendance/scan/card ===');
+        print('URL: $uri');
+        print('Request body: $bodyJson');
+      }
+      var response = await http.post(uri, headers: headers, body: bodyJson);
+      if (kDebugMode) {
+        print('Response status: ${response.statusCode}');
+        print('Response body: ${response.body}');
+        print('==========================================================');
+      }
+
+      Map<String, dynamic> results = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return legacy.CheckInModel.fromJson(results);
+      }
+      return legacy.CheckInModel(
+        success: false,
+        status: response.statusCode,
+        message: results['message'] ?? 'Scan failed',
+      );
+    } catch (e) {
+      if (kDebugMode) print('Error scanCardForEvent: $e');
+      return legacy.CheckInModel(
+        success: false,
+        status: 500,
+        message: 'Error: ${e.toString()}',
+      );
+    }
+  }
+
+  /// POST /api/attendance/create
+  /// Event: body { eventId, date } — school-wide, no classroomId.
+  /// Settings:
+  ///   CHECK_IN_ONLY: classroomId required. Body: { settingsId, classroomId, date }.
+  ///   CHECK_IN_OUT: classroomId optional. No classroomId → all classrooms; with classroomId → one classroom.
+  Future<AttendanceModel> createAttendanceBySettingsOrEvent({
+    String? eventId,
+    String? settingsId,
+    String? classroomId,
+    required String date,
+  }) async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('token');
+
+      if (token == null) {
+        return AttendanceModel(
+          status: 401,
+          success: false,
+          message: 'Authentication token not found',
+          data: null,
+        );
+      }
+
+      Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': _cleanToken(token),
+      };
+
+      final Map<String, dynamic> body;
+      if (eventId != null && eventId.isNotEmpty) {
+        body = {'eventId': eventId, 'date': date};
+      } else if (settingsId != null && settingsId.isNotEmpty) {
+        body = {'settingsId': settingsId, 'date': date};
+        if (classroomId != null && classroomId.isNotEmpty) {
+          body['classroomId'] = classroomId;
+        }
+      } else {
+        return AttendanceModel(
+          success: false,
+          message: eventId != null
+              ? 'eventId is required for event attendance'
+              : 'settingsId is required for settings-based attendance',
+          data: null,
+        );
+      }
+
+      final uri = Uri.parse(ApiEndpoints.attendanceCreate);
+      var response = await http.post(uri, headers: headers, body: jsonEncode(body));
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        Map<String, dynamic>? err;
+        try {
+          final decoded = jsonDecode(response.body);
+          err = decoded is Map<String, dynamic> ? decoded : null;
+        } catch (_) {}
+        return AttendanceModel(
+          status: response.statusCode,
+          success: false,
+          message: err?['message'] ?? 'Failed to create attendance',
+          data: null,
+        );
+      }
+
+      final decoded = jsonDecode(response.body);
+
+      // API may return a single object or a list of sessions
+      if (decoded is List<dynamic> && decoded.isNotEmpty) {
+        final first = decoded.first;
+        if (first is Map<String, dynamic>) {
+          return AttendanceModel(
+            status: 200,
+            success: true,
+            message: 'OK',
+            data: Data.fromJson(first),
+          );
+        }
+      }
+
+      if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is List<dynamic> && data.isNotEmpty) {
+          final first = data.first;
+          if (first is Map<String, dynamic>) {
+            return AttendanceModel(
+              status: decoded['status'] ?? 200,
+              success: decoded['success'] ?? true,
+              message: decoded['message'],
+              data: Data.fromJson(first),
+            );
+          }
+        }
+        return AttendanceModel.fromJson(decoded);
+      }
+
+      return AttendanceModel(
+        success: false,
+        message: 'Unexpected response format',
+        data: null,
+      );
+    } catch (e) {
+      if (kDebugMode) print('Error createAttendanceBySettingsOrEvent: $e');
+      return AttendanceModel(
+        status: 500,
+        success: false,
+        message: 'Error: ${e.toString()}',
+        data: null,
       );
     }
   }
